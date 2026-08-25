@@ -111,7 +111,12 @@ function incrementalScan() {
       }
       if (m !== index.users[user]) changed.push(user);
     }
-    if (!added.length && !removed.length && !changed.length) return;
+    if (!added.length && !removed.length && !changed.length) {
+      // 目录无变化也记录扫描检查时间，供扫描页展示
+      index.lastScan = { at: Date.now(), type: 'auto' };
+      store.saveIndex(DATA_DIR, index);
+      return;
+    }
     console.log(`[scan] 检测到目录变化：新增 ${added.length}，删除 ${removed.length}，变更 ${changed.length}`);
 
     let media = index.media.filter((x) => !removed.includes(x.user));
