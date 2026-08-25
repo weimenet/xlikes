@@ -109,7 +109,8 @@ docker exec xlikes node scripts/add-user.js <用户名> <密码>
 
 部署前编辑 `docker-compose.yml`：
 - `XLIKES_MEDIA_ROOT`：容器内媒体根目录（建议与下方挂载一致）；
-- `volumes`：把媒体目录、数据目录、证书目录改为实际路径（媒体目录只读挂载）。
+- `volumes`：媒体目录只读挂载到容器内 `XLIKES_MEDIA_ROOT`；数据目录建议放在媒体根目录的
+  `.data` 子目录（容器崩溃/重建不影响配置与缓存）；证书目录改为实际路径。
 
 容器 `restart: unless-stopped`，开机自启。
 

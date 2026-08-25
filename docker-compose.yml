@@ -7,12 +7,12 @@ services:
       - "5287:3000"                  # HTTPS 主入口 https://<主机IP>:5287
       - "5280:3080"                  # HTTP 跳转 -> https://<主机IP>:5287
     environment:
-      XLIKES_MEDIA_ROOT: /data/media # 容器内媒体根目录（部署者自定义，与下方挂载对应）
+      XLIKES_MEDIA_ROOT: /data/xlikes # 容器内媒体根目录（部署者自定义，与下方挂载对应）
       DATA_DIR: /data/store
       HTTPS_PORT: "3000"
       HTTP_PORT: "3080"
       CERT_DIR: /app/certs
     volumes:
-      - /path/to/media:/data/media:ro          # 媒体根目录（改为实际路径）
-      - /path/to/data:/data/store              # 索引/文案/缩略图缓存（改为实际路径，便于备份）
+      - /path/to/media:/data/xlikes:ro         # 媒体根目录（改为实际路径）
+      - /path/to/media/.data:/data/store       # 配置/缓存（建议放媒体根下 .data，容器崩溃不影响数据）
       - /path/to/certs:/app/certs:ro           # HTTPS 自签名证书（改为实际路径）
