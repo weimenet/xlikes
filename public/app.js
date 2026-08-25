@@ -744,11 +744,9 @@ function renderAccount(container) {
   state.mode = 'account';
   container.appendChild(el('div', 'page-title', '账户管理'));
   const card = el('div', 'post-card');
-  const userBlock = el('div', 'account-user');
-  userBlock.appendChild(el('div', 's-label', '当前用户名'));
+  card.appendChild(el('div', 'account-section-title', '当前用户名'));
   const uname = el('div', 'account-username', '…');
-  userBlock.appendChild(uname);
-  card.appendChild(userBlock);
+  card.appendChild(uname);
   const section = el('div', 'account-section-title', '修改密码');
   card.appendChild(section);
   const form = el('div', 'account-form');
