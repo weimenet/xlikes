@@ -650,7 +650,7 @@ function handleRequest(req, res) {
 }
 
 // ---------- 启动 ----------
-if (process.argv.includes('--rescan') || !index.media.length) scanAndSave('auto');
+if (process.argv.includes('--rescan') || !index.media.length || !index.lastScan) scanAndSave('auto');
 syncNewPosts();
 setInterval(incrementalScan, RESCAN_MS);
 
