@@ -788,8 +788,8 @@ function renderAccount(container) {
     await fetch('/api/logout', { method: 'POST' });
     location.href = '/login.html';
   };
-  card.appendChild(logoutBtn);
   container.appendChild(card);
+  container.appendChild(logoutBtn);
   (async () => {
     try {
       const d = await (await fetch('/api/me')).json();
