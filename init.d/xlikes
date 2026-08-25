@@ -1,0 +1,20 @@
+#!/bin/sh /etc/rc.common
+# OpenWrt / iStoreOS 开机自启动脚本（无 Docker 时使用）
+# 用法：cp init.d/xlikes /etc/init.d/xlikes && chmod +x /etc/init.d/xlikes
+#       /etc/init.d/xlikes enable && /etc/init.d/xlikes start
+
+START=99
+STOP=10
+USE_PROCD=1
+
+ROOT=<deploy-dir>
+PORT=3000
+
+start_service() {
+  procd_open_instance
+  procd_set_param command /usr/bin/node "$ROOT/server.js"
+  procd_set_param env XLIKES_MEDIA_ROOT=<media-root> DATA_DIR="$ROOT/data" PORT="$PORT"
+  procd_set_param respawn 3600 5 5
+  procd_set_param file "$ROOT/server.js"
+  procd_close_instance
+}

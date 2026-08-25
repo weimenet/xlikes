@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xlikes</title>
+  <link rel="stylesheet" href="/style.css?v=5" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo" href="#/">Xlikes</a>
+    <nav>
+      <a href="#/">全部贴文</a>
+      <a href="#/users">ID索引</a>
+      <div class="dropdown" id="consoleMenu">
+        <button class="dropdown-btn" id="consoleBtn" type="button">控制台 ▾</button>
+        <div class="dropdown-list">
+          <a href="#" id="rescan">手动扫描</a>
+          <a href="#/texts">文案</a>
+          <a href="#/logs">日志</a>
+          <a href="#/password">改密</a>
+          <a href="#" id="logout">退出</a>
+        </div>
+      </div>
+    </nav>
+  </header>
+  <main id="main"></main>
+  <div id="loading" class="loading hidden">加载中…</div>
+  <script src="/app.js?v=5"></script>
+</body>
+</html>

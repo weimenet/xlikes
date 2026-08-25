@@ -1,0 +1,14 @@
+{
+  "name": "xlikes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "Xlikes 媒体瀑布流浏览服务（Node 内置模块，零依赖）",
+  "scripts": {
+    "start": "node server.js",
+    "rescan": "node server.js --rescan"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
