@@ -58,7 +58,7 @@ function clientIp(req) {
 }
 
 // ---------- 索引 ----------
-function scanAndSave() {
+function scanAndSave(trigger = 'auto') {
   if (scanning) return;
   scanning = true;
   try {
@@ -67,6 +67,7 @@ function scanAndSave() {
     const { media, users } = scanner.scanRoot(ROOT, LIMIT);
     index.media = scanner.sortByTimeDesc(media);
     index.users = users;
+    index.lastScan = { at: Date.now(), type: trigger };
     store.saveIndex(DATA_DIR, index);
     syncNewPosts();
     console.log(`[scan] 完成，共 ${media.length} 条媒体，耗时 ${Date.now() - t0}ms`);
@@ -131,6 +132,7 @@ function incrementalScan() {
     }
     for (const user of removed) delete index.users[user];
     index.media = scanner.sortByTimeDesc(media);
+    index.lastScan = { at: Date.now(), type: 'auto' };
     store.saveIndex(DATA_DIR, index);
     syncNewPosts();
   } catch (err) {
@@ -497,8 +499,17 @@ async function handleApi(req, res, pathname, query) {
     });
   }
   if (pathname === '/api/refresh') {
-    setImmediate(scanAndSave);
+    setImmediate(() => scanAndSave('manual'));
     return sendJson(res, 202, { scanning: true });
+  }
+  if (pathname === '/api/stats') {
+    return sendJson(res, 200, {
+      users: Object.keys(index.users || {}).length,
+      media: (index.media || []).length,
+      lastScanAt: index.lastScan ? index.lastScan.at : null,
+      lastScanType: index.lastScan ? index.lastScan.type : null,
+      scanning,
+    });
   }
   if (pathname === '/api/texts') {
     const status = query.get('status');
@@ -634,7 +645,7 @@ function handleRequest(req, res) {
 }
 
 // ---------- 启动 ----------
-if (process.argv.includes('--rescan') || !index.media.length) scanAndSave();
+if (process.argv.includes('--rescan') || !index.media.length) scanAndSave('auto');
 syncNewPosts();
 setInterval(incrementalScan, RESCAN_MS);
 

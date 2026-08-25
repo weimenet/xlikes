@@ -13,40 +13,6 @@ window.fetch = async (...args) => {
   return res;
 };
 
-const logoutBtn = document.getElementById('logout');
-if (logoutBtn) {
-  logoutBtn.onclick = async (e) => {
-    e.preventDefault();
-    await fetch('/api/logout', { method: 'POST' });
-    location.href = '/login.html';
-  };
-}
-
-// 控制台下拉菜单
-const consoleBtn = document.getElementById('consoleBtn');
-const consoleWrap = document.getElementById('consoleMenu');
-if (consoleBtn && consoleWrap) {
-  consoleBtn.onclick = (e) => {
-    e.stopPropagation();
-    consoleWrap.classList.toggle('open');
-  };
-  consoleWrap.addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', () => consoleWrap.classList.remove('open'));
-  consoleWrap.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => consoleWrap.classList.remove('open')));
-}
-
-// 手动扫描
-const rescanBtn = document.getElementById('rescan');
-if (rescanBtn) {
-  rescanBtn.onclick = async (e) => {
-    e.preventDefault();
-    try {
-      await fetch('/api/refresh');
-      showToast('已开始扫描，稍后自动更新');
-    } catch {}
-  };
-}
-
 function showToast(msg) {
   let t = document.getElementById('toast');
   if (!t) {
@@ -608,20 +574,20 @@ function openLightbox(url) {
 const STATUS_LABEL = { ok: '已抓取', pending: '待抓取', failed: '抓取失败', not_found: '原帖不存在' };
 const textState = { status: '', offset: 0, total: 0 };
 
-async function renderTexts() {
+async function renderTexts(container) {
   state.mode = 'texts';
   clearInterval(textTimer);
-  $main.innerHTML = '';
-  $main.appendChild(el('div', 'page-title', '文案抓取管理'));
+  container.innerHTML = '';
+  container.appendChild(el('div', 'page-title', '文案抓取管理'));
   const progressWrap = el('div', 'progress-wrap');
   const bar = el('div', 'progress-bar');
   const fill = el('div', 'progress-fill');
   bar.appendChild(fill);
   const progLabel = el('span', 'progress-label', '…');
   progressWrap.append(bar, progLabel);
-  $main.appendChild(progressWrap);
+  container.appendChild(progressWrap);
   const msg = el('div', 'msg', '');
-  $main.appendChild(msg);
+  container.appendChild(msg);
 
   function updateProgress(p) {
     if (!p || !p.total) return;
@@ -645,12 +611,12 @@ async function renderTexts() {
     c.onclick = () => {
       textState.status = cfg.filter;
       textState.offset = 0;
-      renderTexts();
+      renderConsole();
     };
     statsRow.appendChild(c);
     return c;
   });
-  $main.appendChild(statsRow);
+  container.appendChild(statsRow);
 
   const toolbar = el('div', 'toolbar');
   const input = el('input');
@@ -659,7 +625,7 @@ async function renderTexts() {
   const retryAll = el('button', 'btn', '重试全部失败');
   const refresh = el('button', 'btn', '刷新');
   toolbar.append(input, addBtn, retryAll, refresh);
-  $main.appendChild(toolbar);
+  container.appendChild(toolbar);
 
   addBtn.onclick = async () => {
     const url = input.value.trim();
@@ -673,7 +639,7 @@ async function renderTexts() {
     msg.textContent = r.ok ? `已加入抓取队列：@${d.user} ${d.tweetId}` : d.error || '添加失败';
     input.value = '';
     textState.offset = 0;
-    renderTexts();
+    renderConsole();
   };
   retryAll.onclick = async () => {
     const r = await fetch('/api/texts/retry-all', {
@@ -684,16 +650,16 @@ async function renderTexts() {
     const d = await r.json();
     msg.textContent = `已把 ${d.count} 条加入重试队列`;
     textState.offset = 0;
-    renderTexts();
+    renderConsole();
   };
-  refresh.onclick = () => renderTexts();
+  refresh.onclick = () => renderConsole();
 
   const list = el('div', 'text-list');
-  $main.appendChild(list);
+  container.appendChild(list);
   const moreBtn = el('button', 'btn', '加载更多');
   moreBtn.style.display = 'none';
   moreBtn.onclick = loadTexts;
-  $main.appendChild(moreBtn);
+  container.appendChild(moreBtn);
 
   async function loadTexts() {
     const q = textState.status ? `&status=${textState.status}` : '';
@@ -749,12 +715,12 @@ async function renderTexts() {
 }
 
 // ---------- 登录日志页 ----------
-async function renderLogs() {
+async function renderLogs(container) {
   state.mode = 'logs';
-  $main.innerHTML = '';
-  $main.appendChild(el('div', 'page-title', '登录日志（最近 50 条）'));
+  container.innerHTML = '';
+  container.appendChild(el('div', 'page-title', '登录日志（最近 50 条）'));
   const list = el('div', 'text-list');
-  $main.appendChild(list);
+  container.appendChild(list);
   try {
     const data = await (await fetch('/api/login-log?limit=50')).json();
     const RESULT = { ok: '成功', bad_password: '密码错误', unknown_user: '用户不存在', missing_fields: '缺少字段' };
@@ -773,14 +739,17 @@ async function renderLogs() {
   }
 }
 
-// ---------- 修改密码页 ----------
-function renderPassword() {
-  state.mode = 'password';
-  $main.innerHTML = '';
-  const page = el('div', 'post-page');
-  $main.appendChild(page);
-  page.appendChild(el('div', 'page-title', '修改密码'));
+// ---------- 账户管理页 ----------
+function renderAccount(container) {
+  state.mode = 'account';
+  container.appendChild(el('div', 'page-title', '账户管理'));
   const card = el('div', 'post-card');
+  const userRow = el('div', 'stats-line');
+  const uname = el('span', 's-value', '…');
+  userRow.append(el('span', 's-label', '当前用户名'), uname);
+  card.appendChild(userRow);
+  const section = el('div', 'account-section-title', '修改密码');
+  card.appendChild(section);
   const oldP = el('input');
   oldP.type = 'password';
   oldP.placeholder = '当前密码';
@@ -811,7 +780,87 @@ function renderPassword() {
   oldP.style.marginBottom = '10px';
   newP.style.marginBottom = '10px';
   confirmP.style.marginBottom = '14px';
-  page.appendChild(card);
+  const logoutBtn = el('button', 'btn logout-btn', '退出登录');
+  logoutBtn.onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/login.html';
+  };
+  card.append(oldP, newP, confirmP, btn, msg, logoutBtn);
+  container.appendChild(card);
+  (async () => {
+    try {
+      const d = await (await fetch('/api/me')).json();
+      uname.textContent = d.username || '?';
+    } catch {}
+  })();
+}
+
+// ---------- 扫描页 ----------
+async function renderScan(container) {
+  container.appendChild(el('div', 'page-title', '扫描'));
+  const card = el('div', 'post-card');
+  const btn = el('button', 'btn primary', '立即扫描');
+  function setRows(d) {
+    card.innerHTML = '';
+    const items = [
+      ['用户 ID 数量', d.users],
+      ['媒体数量', d.media],
+      ['上一次扫描时间', d.lastScanAt ? fmtTime(d.lastScanAt) : '从未扫描'],
+      ['扫描类型', d.lastScanType === 'manual' ? '手动扫描' : d.lastScanType === 'auto' ? '自动扫描' : '—'],
+      ['扫描状态', d.scanning ? '扫描中…' : '空闲'],
+    ];
+    for (const [label, val] of items) {
+      const row = el('div', 'stats-line');
+      row.append(el('span', 's-label', label), el('span', 's-value', String(val)));
+      card.appendChild(row);
+    }
+  }
+  async function poll() {
+    const d = await (await fetch('/api/stats')).json();
+    setRows(d);
+    if (d.scanning) {
+      btn.disabled = true;
+      btn.textContent = '扫描中…';
+      setTimeout(poll, 2000);
+    } else {
+      btn.disabled = false;
+      btn.textContent = '立即扫描';
+    }
+  }
+  btn.onclick = async () => {
+    try { await fetch('/api/refresh'); } catch {}
+    poll();
+  };
+  container.append(btn, card);
+  poll();
+}
+
+// ---------- 控制台页 ----------
+function renderConsole() {
+  state.mode = 'console';
+  clearInterval(textTimer);
+  const sub = (location.hash.split('/')[2]) || 'scan';
+  $main.innerHTML = '';
+  const layout = el('div', 'console-layout');
+  const side = el('aside', 'console-side');
+  const navs = [
+    ['scan', '扫描'],
+    ['texts', '文案'],
+    ['logs', '日志'],
+    ['account', '账户管理'],
+  ];
+  for (const [key, label] of navs) {
+    const a = el('a', `console-nav${sub === key ? ' active' : ''}`, label);
+    a.href = `#/console/${key}`;
+    side.appendChild(a);
+  }
+  const content = el('div', 'console-content');
+  layout.append(side, content);
+  $main.appendChild(layout);
+  if (sub === 'texts') renderTexts(content);
+  else if (sub === 'logs') renderLogs(content);
+  else if (sub === 'account') renderAccount(content);
+  else renderScan(content);
 }
 
 function escapeHtml(s) {
@@ -824,9 +873,10 @@ function render() {
   const h = location.hash;
   if (h.startsWith('#/post/')) renderPost(h.slice(7));
   else if (h.startsWith('#/user/')) renderUser(decodeURIComponent(h.slice(7)));
-  else if (h.startsWith('#/texts')) renderTexts();
-  else if (h.startsWith('#/logs')) renderLogs();
-  else if (h.startsWith('#/password')) renderPassword();
+  else if (h.startsWith('#/console')) renderConsole();
+  else if (h.startsWith('#/texts')) location.hash = '#/console/texts';
+  else if (h.startsWith('#/logs')) location.hash = '#/console/logs';
+  else if (h.startsWith('#/password')) location.hash = '#/console/account';
   else if (h.startsWith('#/users')) renderUsers();
   else renderFeed();
 }

@@ -34,33 +34,46 @@ img, video { display: block; }
 .topbar nav a { color: var(--muted); font-size: 14px; }
 .topbar nav a:hover { color: var(--text); }
 
-/* 控制台下拉菜单 */
-.dropdown { position: relative; }
-.dropdown-btn {
-  background: none;
-  border: none;
+/* 控制台布局 */
+.console-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 18px 20px;
+}
+.console-side {
+  position: sticky;
+  top: 68px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 150px;
+  flex-shrink: 0;
+}
+.console-nav {
+  padding: 10px 14px;
+  border-radius: 10px;
   color: var(--muted);
   font-size: 14px;
-  cursor: pointer;
-  padding: 0;
-  font-family: inherit;
 }
-.dropdown-btn:hover, .dropdown.open .dropdown-btn { color: var(--text); }
-.dropdown-list {
-  display: none;
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 120px;
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 6px;
-  z-index: 20;
+.console-nav:hover { background: rgba(29, 155, 240, 0.1); color: var(--text); }
+.console-nav.active { background: rgba(29, 155, 240, 0.15); color: var(--accent); font-weight: 600; }
+.console-content { flex: 1; min-width: 0; }
+.stats-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
 }
-.dropdown.open .dropdown-list { display: block; }
-.dropdown-list a { display: block; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: var(--text); }
-.dropdown-list a:hover { background: rgba(29, 155, 240, 0.12); color: var(--accent); }
+.stats-line:last-child { border-bottom: none; }
+.s-label { color: var(--muted); }
+.s-value { font-weight: 600; }
+.account-section-title { font-weight: 700; margin: 18px 0 10px; }
+.logout-btn { margin-top: 16px; width: 100%; }
 
 /* 搜索栏 */
 .searchbar {
