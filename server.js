@@ -24,7 +24,9 @@ const AUTO_RETRY_DELAY_MS = 10 * 60 * 1000; // 失败后自动重试间隔
 
 let index = store.loadIndex(DATA_DIR);
 let posts = store.loadPosts(DATA_DIR);
+let userMeta = store.loadUserMeta(DATA_DIR);
 const auth = new Auth(DATA_DIR);
+const AVATAR_DIR = path.join(DATA_DIR, 'avatars');
 let scanning = false;
 const fetchQueue = new Set();
 
@@ -157,11 +159,24 @@ setInterval(async () => {
   console.log(`[fetch] 抓取文案 ${user}/${id}`);
   const r = await fetchText(id, user);
   const retryCount = r.status === 'failed' ? (post.retryCount || 0) + 1 : 0;
+  if (r.displayName || r.avatarUrl) {
+    const meta = userMeta[user] || {};
+    if (r.displayName) meta.displayName = r.displayName;
+    if (r.avatarUrl) {
+      meta.avatarUrl = r.avatarUrl;
+      downloadAvatar(user, r.avatarUrl);
+    }
+    userMeta[user] = meta;
+    store.saveUserMeta(DATA_DIR, userMeta);
+  }
+  const meta = userMeta[user] || {};
   posts[id] = {
     ...post,
     text: r.text,
     source: r.source,
     status: r.status,
+    displayName: r.displayName || meta.displayName || undefined,
+    avatarUrl: r.avatarUrl || meta.avatarUrl || undefined,
     retryCount,
     error: r.status === 'not_found' ? 'not_found' : r.status === 'failed' ? 'fetch_failed' : undefined,
     fetchedAt: Date.now(),
@@ -249,6 +264,58 @@ function thumbUrl(item) {
   return `/thumb/${encodeURIComponent(item.rel)}`;
 }
 
+function findAvatarFile(user) {
+  try {
+    const prefix = encodeURIComponent(user) + '.';
+    const name = fs.readdirSync(AVATAR_DIR).find((f) => f.startsWith(prefix));
+    return name ? path.join(AVATAR_DIR, name) : null;
+  } catch {
+    return null;
+  }
+}
+
+// 返回用户显示信息：显示名 + 是否有本地头像缓存
+function userInfo(user) {
+  const meta = userMeta[user] || {};
+  return { displayName: meta.displayName || '', avatar: !!findAvatarFile(user) };
+}
+
+// 下载头像到本地缓存（同一用户每天最多一次，失败静默）
+function downloadAvatar(user, url) {
+  if (!url || !/^https?:/i.test(url)) return;
+  const meta = userMeta[user] || {};
+  if (Date.now() - (meta.avatarAt || 0) < 24 * 3600 * 1000) return;
+  fs.mkdirSync(AVATAR_DIR, { recursive: true });
+  const mod = url.startsWith('https:') ? https : http;
+  const req = mod.get(url, { headers: { 'user-agent': 'Xlikes/1.0' } }, (res) => {
+    if (res.statusCode !== 200) {
+      res.resume();
+      return;
+    }
+    let ext;
+    try {
+      ext = (path.extname(new URL(url).pathname) || '.jpg').toLowerCase();
+    } catch {
+      ext = '.jpg';
+    }
+    if (!['.jpg', '.jpeg', '.png', '.webp'].includes(ext)) ext = '.jpg';
+    const file = path.join(AVATAR_DIR, `${encodeURIComponent(user)}${ext}`);
+    const ws = fs.createWriteStream(file);
+    res.pipe(ws);
+    ws.on('finish', () => {
+      userMeta[user] = { ...(userMeta[user] || {}), avatarAt: Date.now() };
+      store.saveUserMeta(DATA_DIR, userMeta);
+    });
+    ws.on('error', () => {
+      try {
+        fs.unlinkSync(file);
+      } catch {}
+    });
+  });
+  req.setTimeout(15000, () => req.destroy());
+  req.on('error', () => {});
+}
+
 // 将媒体项按帖子聚合（同一 tweetId 合并），媒体按媒体编号排序，附带已抓取文案
 function groupPosts(list, sort) {
   const map = new Map();
@@ -270,6 +337,9 @@ function groupPosts(list, sort) {
   for (const p of arr) {
     const t = posts[p.tweetId];
     p.text = t && t.status === 'ok' ? t.text : null;
+    const ui = userInfo(p.user);
+    p.displayName = ui.displayName;
+    p.avatar = ui.avatar;
     p.media.sort((a, b) => a.mediaIndex - b.mediaIndex);
   }
   return arr;
@@ -424,6 +494,11 @@ async function handleApi(req, res, pathname, query) {
     const users = [...byUser.values()]
       .filter((u) => !q || u.user.toLowerCase().includes(q))
       .sort((a, b) => b.count - a.count);
+    for (const u of users) {
+      const ui = userInfo(u.user);
+      u.displayName = ui.displayName;
+      u.avatar = ui.avatar;
+    }
     return sendJson(res, 200, { items: users.slice(offset, offset + limit), total: users.length });
   }
   if (pathname === '/api/search') {
@@ -471,7 +546,19 @@ async function handleApi(req, res, pathname, query) {
     const items = index.media.filter((x) => x.user === user);
     const postsArr = groupPosts(items, 'new');
     const page = postsArr.slice(offset, offset + limit);
-    return sendJson(res, 200, { user, items: page, total: postsArr.length });
+    const ui = userInfo(user);
+    return sendJson(res, 200, {
+      user,
+      displayName: ui.displayName,
+      avatar: ui.avatar,
+      items: page,
+      total: postsArr.length,
+    });
+  }
+  m = pathname.match(/^\/api\/user-meta\/([^/]+)$/);
+  if (m) {
+    const user = decodeURIComponent(m[1]);
+    return sendJson(res, 200, { user, ...userInfo(user) });
   }
   m = pathname.match(/^\/api\/post\/(\d+)$/);
   if (m) {
@@ -481,9 +568,12 @@ async function handleApi(req, res, pathname, query) {
     const item = media[0];
     const p = posts[tweetId];
     ensureTextJob(tweetId);
+    const ui = userInfo(item.user);
     return sendJson(res, 200, {
       tweetId,
       user: item.user,
+      displayName: ui.displayName,
+      avatar: ui.avatar,
       date: item.date,
       time: item.time,
       media: media.map((x) => ({ ...x, url: mediaUrl(x), thumbUrl: thumbUrl(x) })),
@@ -615,6 +705,17 @@ function handleRequest(req, res) {
   }
 
   if (pathname.startsWith('/api/')) return handleApi(req, res, pathname, u.searchParams);
+
+  if (pathname.startsWith('/avatar/')) {
+    const user = decodeURIComponent(pathname.slice('/avatar/'.length));
+    const file = findAvatarFile(user);
+    if (!file) {
+      res.writeHead(404);
+      res.end('Not Found');
+      return;
+    }
+    return serveFile(req, res, file);
+  }
 
   if (pathname.startsWith('/thumb/')) {
     let rel;

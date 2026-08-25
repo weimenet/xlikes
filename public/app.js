@@ -104,10 +104,20 @@ function el(tag, cls, html) {
   return node;
 }
 
+// 头像：优先本地缓存图，失败回退彩色占位
 function avatar(user, size) {
-  const node = el('div', 'avatar', user[0].toUpperCase());
-  node.style.cssText = `background: hsl(${hashUser(user)} 70% 45%); width:${size || 44}px;height:${size || 44}px;`;
-  return node;
+  const img = document.createElement('img');
+  img.className = 'avatar';
+  img.loading = 'lazy';
+  img.src = `/avatar/${encodeURIComponent(user)}`;
+  img.alt = user;
+  img.style.cssText = `width:${size || 44}px;height:${size || 44}px;object-fit:cover;`;
+  img.onerror = () => {
+    const d = el('div', 'avatar', user[0].toUpperCase());
+    d.style.cssText = `background: hsl(${hashUser(user)} 70% 45%); width:${size || 44}px;height:${size || 44}px;`;
+    img.replaceWith(d);
+  };
+  return img;
 }
 
 // 帖子卡片：同一帖子的媒体拼图合并 + 底部悬浮 ID/文案
@@ -130,7 +140,8 @@ function postCard(post) {
   }
   a.appendChild(grid);
   const overlay = el('div', 'card-overlay');
-  overlay.appendChild(el('div', 'overlay-id', `@${post.user}`));
+  overlay.appendChild(el('div', 'overlay-id', post.displayName ? escapeHtml(post.displayName) : `@${post.user}`));
+  if (post.displayName) overlay.appendChild(el('div', 'overlay-handle', `@${post.user}`));
   overlay.appendChild(el('div', 'overlay-text', post.text ? escapeHtml(post.text) : ''));
   a.appendChild(overlay);
   return a;
@@ -282,9 +293,10 @@ async function renderUsers() {
       for (const u of groups.get(k)) {
         const card = el('a', 'user-card');
         card.href = `#/user/${encodeURIComponent(u.user)}`;
-        const av = el('div', 'avatar', u.user[0].toUpperCase());
-        av.style.cssText = `background: hsl(${hashUser(u.user)} 70% 45%);`;
-        const body = el('div', '', `<div class="name">@${u.user}</div><div class="sub">${u.first} ~ ${u.last}</div>`);
+        const av = avatar(u.user);
+        const name = u.displayName ? escapeHtml(u.displayName) : `@${escapeHtml(u.user)}`;
+        const sub = u.displayName ? `@${escapeHtml(u.user)} · ${u.first} ~ ${u.last}` : `${u.first} ~ ${u.last}`;
+        const body = el('div', '', `<div class="name">${name}</div><div class="sub">${sub}</div>`);
         const count = el('div', 'count', `${u.count}`);
         card.append(av, body, count);
         grid.appendChild(card);
@@ -340,10 +352,19 @@ async function renderUser(user) {
   head.appendChild(back);
   const info = el('div', 'user-head');
   info.appendChild(avatar(user, 56));
-  info.appendChild(el('div', '', `<div class="uname" style="font-size:18px">@${user}</div>`));
+  const unameWrap = el('div', '', `<div class="uname" style="font-size:18px">@${escapeHtml(user)}</div>`);
+  info.appendChild(unameWrap);
   head.appendChild(info);
   $main.appendChild(head);
   $main.appendChild(createColumns());
+  (async () => {
+    try {
+      const d = await (await fetch(`/api/user-meta/${encodeURIComponent(user)}`)).json();
+      if (d.displayName) {
+        unameWrap.innerHTML = `<div class="uname" style="font-size:18px">${escapeHtml(d.displayName)}</div><div class="handle">@${escapeHtml(user)}</div>`;
+      }
+    } catch {}
+  })();
   loadMore();
 }
 
@@ -364,7 +385,15 @@ async function renderPost(tweetId) {
     const card = el('article', 'post-card');
     const head = el('div', 'post-head');
     head.appendChild(avatar(data.user, 48));
-    head.appendChild(el('div', '', `<div class="uname">@${data.user}</div><div class="udate">${fmtTime(data.time)}</div>`));
+    const unameWrap = el(
+      'div',
+      '',
+      data.displayName
+        ? `<div class="uname">${escapeHtml(data.displayName)}</div><div class="handle">@${escapeHtml(data.user)}</div>`
+        : `<div class="uname">@${escapeHtml(data.user)}</div>`
+    );
+    unameWrap.appendChild(el('div', 'udate', fmtTime(data.time)));
+    head.appendChild(unameWrap);
     const xlink = el('a', 'xlink', '查看原文 ↗');
     xlink.href = data.postUrl;
     xlink.target = '_blank';
@@ -465,7 +494,13 @@ async function renderSearchResults(q) {
       ).json();
       for (const it of data.items) {
         const row = el('div', 'text-row');
-        const link = el('a', '', `@${it.user}`);
+        const link = el(
+          'a',
+          '',
+          it.displayName
+            ? `${escapeHtml(it.displayName)} <span class="handle">@${escapeHtml(it.user)}</span>`
+            : `@${escapeHtml(it.user)}`
+        );
         link.href = `#/post/${it.tweetId}`;
         const tid = el('span', 'tid', it.tweetId);
         const date = el('span', 'time', it.date);

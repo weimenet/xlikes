@@ -254,6 +254,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
   pointer-events: none;
 }
 .overlay-id { color: #fff; font-weight: 700; font-size: 13px; }
+.overlay-handle { color: rgba(255, 255, 255, 0.75); font-size: 11px; }
 .overlay-text {
   color: #fff;
   font-size: 12px;
@@ -292,6 +293,8 @@ main { max-width: 1440px; margin: 0 auto; padding: 16px; }
   color: #fff;
   flex-shrink: 0;
 }
+img.avatar { display: block; }
+.handle { color: var(--muted); font-size: 12px; font-weight: 400; }
 .user-card .name { font-weight: 700; }
 .user-card .sub { color: var(--muted); font-size: 12px; }
 .user-card .count { margin-left: auto; color: var(--accent); font-weight: 700; }
