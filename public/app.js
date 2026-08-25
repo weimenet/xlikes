@@ -824,7 +824,7 @@ function renderSettings() {
   const card = el('div', 'post-card');
   const dirInput = el('input');
   dirInput.placeholder = '宿主机实际路径，如 /path/to/downloads';
-  const hint = el('div', 'msg', '媒体下载功能的输出目录（部署机上的实际绝对路径，不是容器内路径）；使用时需将该路径以可写方式挂载进容器。');
+  const hint = el('div', 'msg', '媒体下载功能的输出目录（部署机上的实际绝对路径）。设在媒体根目录内时，保存后自动映射到容器内，立即生效。');
   const msg = el('div', 'msg', '');
   const btn = el('button', 'btn primary', '保存');
   btn.onclick = async () => {
@@ -834,7 +834,11 @@ function renderSettings() {
       body: JSON.stringify({ downloadDir: dirInput.value }),
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok) msg.textContent = '已保存。';
+    if (r.ok) {
+      if (d.containerPath) msg.textContent = `已保存，容器内路径 ${d.containerPath}，立即生效。`;
+      else if (d.warning) msg.textContent = `已保存，但${d.warning}。`;
+      else msg.textContent = '已保存。';
+    }
     else msg.textContent = d.error || '保存失败';
   };
   card.append(dirInput, hint, btn, msg);

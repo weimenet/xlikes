@@ -93,6 +93,7 @@ node scripts/add-user.js <用户名> <密码>
 ```
 
 环境变量：`XLIKES_MEDIA_ROOT`（媒体根目录，建议必填；缺省为 `./media`）、
+`XLIKES_HOST_MEDIA_ROOT`（宿主机媒体根实际路径，用于把设置中的宿主机下载路径映射为容器内路径）、
 `XLIKES_MEDIA_LIMIT`（媒体扫描上限，0 = 全部）、`DATA_DIR`、`HTTPS_PORT` / `HTTP_PORT`、
 `CERT_DIR`、`RESCAN_MS`（增量扫描间隔）、`FETCH_INTERVAL_MS`（文案抓取限速）。
 
@@ -109,8 +110,11 @@ docker exec xlikes node scripts/add-user.js <用户名> <密码>
 
 部署前编辑 `docker-compose.yml`：
 - `XLIKES_MEDIA_ROOT`：容器内媒体根目录（建议与下方挂载一致）；
-- `volumes`：媒体目录只读挂载到容器内 `XLIKES_MEDIA_ROOT`；数据目录建议放在媒体根目录的
+- `XLIKES_HOST_MEDIA_ROOT`：宿主机媒体根的实际路径（部署机视角）；
+- `volumes`：媒体目录**可写**挂载到容器内 `XLIKES_MEDIA_ROOT`（供下载功能输出）；数据目录建议放在媒体根目录的
   `.data` 子目录（容器崩溃/重建不影响配置与缓存）；证书目录改为实际路径。
+
+控制台“设置”中的下载文件夹路径填宿主机实际路径；只要位于媒体根目录内，保存后会自动映射为容器内路径并立即生效。
 
 容器 `restart: unless-stopped`，开机自启。
 
