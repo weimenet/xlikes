@@ -749,6 +749,12 @@ function renderAccount(container) {
   const uname = el('div', 'account-username', '…');
   userBlock.appendChild(uname);
   card.appendChild(userBlock);
+  const logoutBtn = el('button', 'btn logout-btn', '退出登录');
+  logoutBtn.onclick = async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/login.html';
+  };
+  card.appendChild(logoutBtn);
   const section = el('div', 'account-section-title', '修改密码');
   card.appendChild(section);
   const form = el('div', 'account-form');
@@ -783,12 +789,6 @@ function renderAccount(container) {
   };
   form.append(oldP, newP, confirmP, btn, msg);
   card.appendChild(form);
-  const logoutBtn = el('button', 'btn logout-btn', '退出登录');
-  logoutBtn.onclick = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    location.href = '/login.html';
-  };
-  card.appendChild(logoutBtn);
   container.appendChild(card);
   (async () => {
     try {
