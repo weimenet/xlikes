@@ -68,6 +68,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=${GITHUB_REF_NAME#v}
+          # 同名 Release 已存在时先删除（重新发布场景），保留 tag
+          gh release delete "$GITHUB_REF_NAME" --yes 2>/dev/null || true
           gh release create "$GITHUB_REF_NAME" \
             "xlikes-$VERSION.tar.gz" \
             --title "$GITHUB_REF_NAME" \
