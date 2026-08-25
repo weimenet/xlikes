@@ -121,59 +121,86 @@ node scripts/add-user.js <用户名> <密码>
 容器内的**代码**在构建镜像时通过 `Dockerfile` 的 `COPY` 写入镜像（`server.js`、`lib/`、`public/`、`scripts/`）；
 **配置与数据**通过卷挂载进容器（媒体、数据、证书目录），不随镜像重建丢失。
 
-### 1. 生成 HTTPS 证书（宿主机）
+### 部署前置条件
+
+- 目标机：Linux（含 OpenWrt/iStoreOS）、Docker 20+、`docker-compose`（或 v2 的 `docker compose`）、`openssl`；
+- 本机：`ssh` / `scp` 客户端，且已配置免密登录目标机；
+- 媒体根目录：宿主机上**已存在**的目录，内含 `<用户ID>/<YYYY-MM-DD>/` 结构（见「媒体库结构」）；
+- 目标端口 `5287` / `5280` 未被占用（可用 `ss -ltn | grep -E '5287|5280'` 检查）。
+
+### 占位符说明
+
+下文命令中的占位符按实际环境替换：
+
+| 占位符 | 含义与取值建议 |
+|---|---|
+| `<主机IP>` | 目标机 IP，如局域网路由器的管理地址 |
+| `<部署目录>` | 目标机上的部署位置，建议 `/root/xlikes` |
+| `<媒体根目录>` | 宿主机媒体根目录的实际路径，需已存在且可读 |
+| `<证书目录>` | 宿主机证书目录的实际路径，建议 `<部署目录>/xlikes/certs` |
+
+### 1. 生成 HTTPS 证书
 
 ```bash
 sh scripts/gen-cert.sh
-# 局域网 IP 部署时指定 IP：XLIKES_CERT_CN=<局域网IP> sh scripts/gen-cert.sh
+# 局域网 IP 部署时指定 IP：XLIKES_CERT_CN=<主机IP> sh scripts/gen-cert.sh
 ```
 
-证书生成在 `certs/`（cert.pem / key.pem），部署时挂载进容器。
+证书生成在项目 `certs/`（cert.pem / key.pem），随代码一起传输，并挂载进容器（见步骤 3 的 `volumes`）。
 
 ### 2. 编辑 docker-compose.yml
 
-按实际环境修改环境变量与三个挂载路径：
+按实际环境修改环境变量与三个挂载路径（示例与仓库自带的 `docker-compose.yml` 一致）：
 
 ```yaml
 services:
   xlikes:
     build: .                       # 从当前目录构建镜像（代码写入容器）
+    container_name: xlikes
+    restart: unless-stopped        # 开机/崩溃后自动拉起
     ports:
       - "5287:3000"                # HTTPS 主入口
       - "5280:3080"                # HTTP 跳转 HTTPS
     environment:
       XLIKES_MEDIA_ROOT: /data/xlikes      # 容器内媒体根目录
       DATA_DIR: /data/store                # 容器内数据目录
+      HTTPS_PORT: "3000"
+      HTTP_PORT: "3080"
       CERT_DIR: /app/certs                 # 容器内证书目录
     volumes:
-      - /path/to/media:/data/xlikes:ro     # 媒体根目录（宿主机实际路径，只读）
-      - /path/to/media/.data:/data/store   # 配置/缓存（建议放媒体根下 .data，可写）
-      - /path/to/certs:/app/certs:ro       # HTTPS 证书（宿主机实际路径，只读）
+      - <媒体根目录>:/data/xlikes:ro       # 媒体根目录（宿主机实际路径，只读）
+      - <媒体根目录>/.data:/data/store     # 配置/缓存（建议放媒体根下 .data，可写）
+      - <证书目录>:/app/certs:ro           # HTTPS 证书（宿主机实际路径，只读）
 ```
 
 ### 3. 传输代码并启动
 
 ```bash
-# 从本机把项目目录传到目标机
-scp -r xlikes root@<主机IP>:<部署目录>/
+# 从本机把项目目录传到目标机（排除 .git / data / certs / docker-compose.yml，配置以目标机为准）
+tar czf - --exclude=.git --exclude=data --exclude=certs --exclude=docker-compose.yml . \
+  | ssh root@<主机IP> 'mkdir -p <部署目录>/xlikes && tar xzf - -C <部署目录>/xlikes'
+# 证书目录单独传输
+scp -r certs root@<主机IP>:<部署目录>/xlikes/
 
 # 登录目标机，构建镜像并启动容器
 ssh root@<主机IP>
 cd <部署目录>/xlikes
-docker-compose up -d --build
+docker-compose up -d --build        # 使用 compose v2 时改为：docker compose up -d --build
 
 # 首次部署：添加登录用户
-docker exec xlikes node scripts/add-user.js <用户名> <密码>
+docker exec xlikes node scripts/add-user.js <用户名> <密码>   # 密码非空即可，建议至少 8 位
 ```
 
 端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS；容器 `restart: unless-stopped`，开机自启。
 
+若 `5287` / `5280` 已被占用，修改 `ports` 映射（如 `"5288:3000"`）后重新 `up -d`，并据此调整访问地址。
+
 ### 4. 验证
 
 ```bash
-docker ps                          # 容器状态 Up
-docker logs xlikes                 # 启动日志：媒体根目录 / 数据目录 / 待抓取文案数
-curl -k https://127.0.0.1:5287     # 返回登录页
+docker ps                          # xlikes 状态为 Up
+docker logs xlikes                 # 启动日志含：媒体根目录 / 数据目录 / 待抓取文案数
+curl -k -o /dev/null -w "%{http_code}" https://127.0.0.1:5287/login.html   # 期望 200
 ```
 
 ### 更新代码
