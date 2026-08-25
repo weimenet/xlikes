@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/weimenet/xlikes:${{ github.ref_name }}
+            ghcr.io/weimenet/xlikes:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build deployment package
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          tar czf xlikes-$VERSION.tar.gz \
+            --exclude=.git --exclude=data --exclude=certs --exclude=docs \
+            server.js lib public scripts Dockerfile docker-compose.yml init.d README.md
+          ls -lh xlikes-$VERSION.tar.gz
+
+      - name: Build release notes
+        run: |
+          BASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          {
+            echo "## Xlikes $GITHUB_REF_NAME"
+            echo ""
+            echo "自托管 X（Twitter）媒体库浏览器：瀑布流、ID 索引、帖子详情、多源文案抓取、登录保护 + HTTPS。"
+            echo ""
+            if [ -n "$BASE_TAG" ] && [ "$BASE_TAG" != "$GITHUB_REF_NAME" ]; then
+              echo "### 自 $BASE_TAG 以来的变更"
+            else
+              echo "### 首次发布"
+            fi
+            echo ""
+            git log --oneline --no-merges "${BASE_TAG}..HEAD" 2>/dev/null || git log --oneline --no-merges | head -50
+          } > NOTES.md
+          cat NOTES.md
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          gh release create "$GITHUB_REF_NAME" \
+            "xlikes-$VERSION.tar.gz" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file NOTES.md

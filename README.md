@@ -121,6 +121,31 @@ node scripts/add-user.js <用户名> <密码>
 容器内的**代码**在构建镜像时通过 `Dockerfile` 的 `COPY` 写入镜像（`server.js`、`lib/`、`public/`、`scripts/`）；
 **配置与数据**通过卷挂载进容器（媒体、数据、证书目录），不随镜像重建丢失。
 
+### 使用发布镜像（推荐）
+
+每个 Release 会构建并推送容器镜像 `ghcr.io/weimenet/xlikes`（含 `:latest`），并附带部署包
+`xlikes-<版本>.tar.gz`。使用镜像部署无需本机构建：
+
+```yaml
+services:
+  xlikes:
+    image: ghcr.io/weimenet/xlikes:v1.0.0   # 替换为实际版本
+    container_name: xlikes
+    restart: unless-stopped
+    ports:
+      - "5287:3000"
+      - "5280:3080"
+    environment:
+      XLIKES_MEDIA_ROOT: /data/xlikes
+      DATA_DIR: /data/store
+    volumes:
+      - <媒体根目录>:/data/xlikes:ro
+      - <媒体根目录>/.data:/data/store
+      - <证书目录>:/app/certs:ro
+```
+
+证书生成、媒体目录准备与验证步骤与下文一致。
+
 ### 部署前置条件
 
 - 目标机：Linux（含 OpenWrt/iStoreOS）、Docker 20+、`docker-compose`（或 v2 的 `docker compose`）、`openssl`；
