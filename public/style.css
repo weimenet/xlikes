@@ -75,11 +75,8 @@ img, video { display: block; }
 .account-username {
   font-size: 14px;
   font-weight: 400;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  background: var(--card);
   color: var(--text);
+  padding: 4px 0;
   margin-bottom: 10px;
 }
 .account-form .text-input { margin-bottom: 10px; }
