@@ -1,14 +1,14 @@
 # Xlikes
 
-> 自托管的 X（Twitter）媒体库浏览器 —— 从 媒体下载目录扫描图片与视频，
+> 自托管的 X（Twitter）媒体库浏览器 —— 从 xlikes 媒体根目录扫描图片与视频，
 > 提供 Pinterest 风格拼图瀑布流、ID 索引、仿 X 帖子详情与多源文案抓取。
 > 登录保护 + HTTPS，部署在局域网内使用，零 npm 依赖。
 
 ## 简介
 
-媒体文件按 `用户 ID / 发布日期` 的目录结构保存，
-文件名中编码了帖子 ID 与媒体 ID。Xlikes 直接扫描这些文件（只读文件名、不读内容），
-解析出帖子元数据并构建索引，无需额外数据库。
+媒体文件按 `用户 ID / 发布日期` 的目录结构保存，文件名中编码了帖子 ID 与媒体 ID。
+Xlikes 直接扫描媒体根目录下的这些文件（只读文件名、不读内容），解析出帖子元数据并构建索引，
+无需额外数据库。
 
 浏览器端提供三层浏览体验：**全部贴文**（按时间排序的拼图瀑布流，同一帖子的多张媒体合并为一张卡片）、
 **ID 索引**（按首字母 / 数字 / 特殊符号分组，右侧面包屑快速跳转）、**帖子页**（缩略图点击看原图，
@@ -29,6 +29,7 @@
 - **多源文案抓取**：fxtwitter → vxtwitter → oembed → Wayback 快照 → x.com embed → x.com 主站，6 级降级；失败自动重试（最多 3 轮），可手动重试 / 手动填写
 - **抓取管理台**：进度条 + 抓取中状态、按状态筛选（已抓取 / 待抓取 / 失败 / 原帖不存在）、手动添加链接
 - **增量扫描**：对比整个目录树（新增 / 删除 / 变更用户），新内容自动入索引并触发文案抓取；控制台提供手动扫描按钮
+- **下载路径设置**：控制台可配置媒体下载输出目录（绝对路径），为媒体下载功能预留
 
 ## 技术栈
 
@@ -50,7 +51,7 @@
                           ├─ /api/login|logout|me|login-log 认证
                           ├─ /thumb  ffmpeg 缩略图（缓存）
                           └─ /media  原图/原视频（HTTP Range）
-媒体根目录 <media-root> ──→ lib/scanner 全目录增量扫描
+媒体根目录（XLIKES_MEDIA_ROOT）──→ lib/scanner 全目录增量扫描
 lib/fetcher ──→ fxtwitter/vxtwitter/oembed/wayback/x embed/x 主站
 ```
 
@@ -70,7 +71,7 @@ xlikes/
 ├── scripts/
 │   ├── add-user.js        # 唯一建号入口（含改密）
 │   ├── gen-cert.sh        # 生成 HTTPS 自签证书
-│   └── parse_xlikes.py   # 独立文件名解析工具
+│   └── parse_xlikes.py    # 独立文件名解析工具
 ├── init.d/xlikes          # OpenWrt procd 自启脚本（无 Docker 备选）
 ├── Dockerfile / docker-compose.yml
 └── data/                  # 运行数据（索引、缓存、用户库；不提交）
@@ -82,8 +83,8 @@ xlikes/
 # 1. 生成 HTTPS 证书
 sh scripts/gen-cert.sh
 
-# 2. 启动（默认媒体根 <media-root>，HTTPS 3000 / HTTP 跳转 3080）
-node server.js
+# 2. 启动（媒体根目录由 XLIKES_MEDIA_ROOT 指定，HTTPS 3000 / HTTP 跳转 3080）
+XLIKES_MEDIA_ROOT=/path/to/media node server.js
 
 # 3. 添加用户
 node scripts/add-user.js <用户名> <密码>
@@ -91,20 +92,25 @@ node scripts/add-user.js <用户名> <密码>
 # 4. 打开 https://localhost:3000 登录
 ```
 
-环境变量：`XLIKES_MEDIA_ROOT`（媒体根目录）、`DATA_DIR`、`HTTPS_PORT` / `HTTP_PORT`、
+环境变量：`XLIKES_MEDIA_ROOT`（媒体根目录，建议必填；缺省为 `./media`）、
+`XLIKES_MEDIA_LIMIT`（媒体扫描上限，0 = 全部）、`DATA_DIR`、`HTTPS_PORT` / `HTTP_PORT`、
 `CERT_DIR`、`RESCAN_MS`（增量扫描间隔）、`FETCH_INTERVAL_MS`（文案抓取限速）。
 
-## Docker 部署（ <host-ip>:5287）
+## Docker 部署
 
 ```bash
-scp -r xlikes root@<host-ip>:/root/
-ssh root@<host-ip>
-cd <deploy-dir> && docker-compose up -d --build
+scp -r xlikes root@<主机IP>:<部署目录>/
+ssh root@<主机IP>
+cd <部署目录>/xlikes && docker-compose up -d --build
 docker exec xlikes node scripts/add-user.js <用户名> <密码>
 ```
 
 端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS。
-挂载：媒体目录 `<media-root>:/data/xlikes:ro`、数据 `<deploy-dir>/data`、证书 `<deploy-dir>/certs`。
+
+部署前编辑 `docker-compose.yml`：
+- `XLIKES_MEDIA_ROOT`：容器内媒体根目录（建议与下方挂载一致）；
+- `volumes`：把媒体目录、数据目录、证书目录改为实际路径（媒体目录只读挂载）。
+
 容器 `restart: unless-stopped`，开机自启。
 
 ## 数据与备份

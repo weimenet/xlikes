@@ -11,7 +11,7 @@ COPY scripts ./scripts
 
 ENV HTTPS_PORT=3000 \
     HTTP_PORT=3080 \
-    XLIKES_MEDIA_ROOT=/data/xlikes \
+    XLIKES_MEDIA_ROOT=/data/media \
     DATA_DIR=/data/store \
     CERT_DIR=/app/certs
 

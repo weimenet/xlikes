@@ -9,7 +9,7 @@ const { fetchText } = require('./lib/fetcher');
 const thumbs = require('./lib/thumbs');
 const { Auth } = require('./lib/auth');
 
-const ROOT = process.env.XLIKES_MEDIA_ROOT || '<media-root>';
+const ROOT = process.env.XLIKES_MEDIA_ROOT || path.join(__dirname, 'media');
 const HTTPS_PORT = Number(process.env.HTTPS_PORT || 3000);
 const HTTP_PORT = Number(process.env.HTTP_PORT || 3080);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -24,6 +24,7 @@ const AUTO_RETRY_DELAY_MS = 10 * 60 * 1000; // 失败后自动重试间隔
 
 let index = store.loadIndex(DATA_DIR);
 let posts = store.loadPosts(DATA_DIR);
+let settings = store.loadSettings(DATA_DIR);
 const auth = new Auth(DATA_DIR);
 let scanning = false;
 const fetchQueue = new Set();
@@ -85,7 +86,7 @@ function incrementalScan() {
   }
   scanning = true;
   try {
-    // 对比整个 媒体目录树：新增用户、删除用户、已有用户内容变化
+    // 对比整个媒体目录树：新增用户、删除用户、已有用户内容变化
     let currentDirs;
     try {
       currentDirs = scanner.listDirs(ROOT);
@@ -500,6 +501,25 @@ async function handleApi(req, res, pathname, query) {
     setImmediate(scanAndSave);
     return sendJson(res, 202, { scanning: true });
   }
+  if (pathname === '/api/settings') {
+    if (req.method === 'GET') {
+      return sendJson(res, 200, { downloadDir: settings.downloadDir || '' });
+    }
+    if (req.method === 'PUT') {
+      const body = await readBody(req);
+      const downloadDir = String(body.downloadDir || '').trim();
+      if (!downloadDir) {
+        return sendJson(res, 400, { error: '下载文件夹路径不能为空' });
+      }
+      if (!path.isAbsolute(downloadDir)) {
+        return sendJson(res, 400, { error: '下载文件夹路径必须是绝对路径' });
+      }
+      settings = { ...settings, downloadDir };
+      store.saveSettings(DATA_DIR, settings);
+      return sendJson(res, 200, { ok: true, downloadDir });
+    }
+    return sendJson(res, 405, { error: '方法不支持' });
+  }
   if (pathname === '/api/texts') {
     const status = query.get('status');
     const offset = Number(query.get('offset') || 0);
@@ -660,6 +680,9 @@ secureServer.listen(HTTPS_PORT, () => {
   console.log(`Xlikes 已启动（HTTPS）: https://0.0.0.0:${HTTPS_PORT}`);
   console.log(`媒体根目录: ${ROOT}`);
   console.log(`数据目录: ${DATA_DIR}`);
+  if (!process.env.XLIKES_MEDIA_ROOT) {
+    console.log(`提示: 未设置 XLIKES_MEDIA_ROOT，使用默认目录 ${ROOT}（可通过环境变量自定义）`);
+  }
   if (!index.media.length) console.log('提示: 索引为空，正在后台扫描，稍后刷新页面');
   const pending = Object.values(posts).filter((p) => p.status === 'pending' || p.status === 'failed').length;
   if (pending) console.log(`[fetch] 后台待抓取文案 ${pending} 条，每 ${FETCH_INTERVAL_MS}ms 抓 1 条`);

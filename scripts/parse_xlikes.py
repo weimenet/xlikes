@@ -5,8 +5,8 @@
 目录结构：<根目录>/<用户ID>/<发布日期YYYY-MM-DD>/<文件名>
 
 用法示例：
-  python3 parse_xlikes.py --paths <media-root>/<user-id>/2026-04-03/<user-id>_20260403__<tweet-id>_1_<media-id>.mp4
-  python3 parse_xlikes.py --root <media-root> --limit 20 --out index.json
+  python3 parse_xlikes.py --paths <媒体根目录>/<user-id>/2026-04-03/<user-id>_20260403__<tweet-id>_1_<media-id>.mp4
+  python3 parse_xlikes.py --root <媒体根目录> --limit 20 --out index.json
 """
 
 import argparse
@@ -65,7 +65,7 @@ def scan(root: str, limit: int | None = None) -> list[dict]:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--paths", nargs="*", help="直接解析的文件路径（不扫描目录）")
-    ap.add_argument("--root", help="媒体根目录，如 <media-root>")
+    ap.add_argument("--root", help="媒体根目录（部署者自定义）")
     ap.add_argument("--limit", type=int, help="最多输出多少条")
     ap.add_argument("--out", help="输出到 JSON 文件，缺省打印到终端")
     args = ap.parse_args()

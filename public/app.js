@@ -814,6 +814,41 @@ function renderPassword() {
   page.appendChild(card);
 }
 
+// ---------- 设置页 ----------
+function renderSettings() {
+  state.mode = 'settings';
+  $main.innerHTML = '';
+  const page = el('div', 'post-page');
+  $main.appendChild(page);
+  page.appendChild(el('div', 'page-title', '设置'));
+  const card = el('div', 'post-card');
+  const dirInput = el('input');
+  dirInput.placeholder = '下载文件夹路径，如 /data/downloads';
+  const hint = el('div', 'msg', '媒体下载功能的输出目录（绝对路径），需与部署时的目录挂载对应。');
+  const msg = el('div', 'msg', '');
+  const btn = el('button', 'btn primary', '保存');
+  btn.onclick = async () => {
+    const r = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ downloadDir: dirInput.value }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) msg.textContent = '已保存。';
+    else msg.textContent = d.error || '保存失败';
+  };
+  card.append(dirInput, hint, btn, msg);
+  dirInput.style.marginBottom = '10px';
+  btn.style.marginTop = '10px';
+  page.appendChild(card);
+  (async () => {
+    try {
+      const d = await (await fetch('/api/settings')).json();
+      dirInput.value = d.downloadDir || '';
+    } catch {}
+  })();
+}
+
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
@@ -827,6 +862,7 @@ function render() {
   else if (h.startsWith('#/texts')) renderTexts();
   else if (h.startsWith('#/logs')) renderLogs();
   else if (h.startsWith('#/password')) renderPassword();
+  else if (h.startsWith('#/settings')) renderSettings();
   else if (h.startsWith('#/users')) renderUsers();
   else renderFeed();
 }

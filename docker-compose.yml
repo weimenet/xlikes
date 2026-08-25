@@ -4,15 +4,15 @@ services:
     container_name: xlikes
     restart: unless-stopped          # 开机/崩溃后自动拉起
     ports:
-      - "5287:3000"                  # HTTPS 主入口 https://<host-ip>:5287
-      - "5280:3080"                  # HTTP 跳转 -> https://…:5287
+      - "5287:3000"                  # HTTPS 主入口 https://<主机IP>:5287
+      - "5280:3080"                  # HTTP 跳转 -> https://<主机IP>:5287
     environment:
-      XLIKES_MEDIA_ROOT: /data/xlikes    # 容器内媒体根目录（映射自 挂载点）
+      XLIKES_MEDIA_ROOT: /data/media # 容器内媒体根目录（部署者自定义，与下方挂载对应）
       DATA_DIR: /data/store
       HTTPS_PORT: "3000"
       HTTP_PORT: "3080"
       CERT_DIR: /app/certs
     volumes:
-      - <media-root>:/data/xlikes:ro   # 目标机上 实际挂载点
-      - <deploy-dir>/data:/data/store          # 索引/文案/缩略图缓存（绑定挂载，便于备份）
-      - <deploy-dir>/certs:/app/certs:ro       # HTTPS 自签名证书
+      - /path/to/media:/data/media:ro          # 媒体根目录（改为实际路径）
+      - /path/to/data:/data/store              # 索引/文案/缩略图缓存（改为实际路径，便于备份）
+      - /path/to/certs:/app/certs:ro           # HTTPS 自签名证书（改为实际路径）
