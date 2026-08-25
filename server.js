@@ -10,8 +10,6 @@ const thumbs = require('./lib/thumbs');
 const { Auth } = require('./lib/auth');
 
 const ROOT = process.env.XLIKES_MEDIA_ROOT || path.join(__dirname, 'media');
-// 宿主机上的媒体根实际路径（部署机视角）；用于把设置里的宿主机下载路径映射为容器内路径
-const HOST_MEDIA_ROOT = process.env.XLIKES_HOST_MEDIA_ROOT || '';
 const HTTPS_PORT = Number(process.env.HTTPS_PORT || 3000);
 const HTTP_PORT = Number(process.env.HTTP_PORT || 3080);
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -26,7 +24,6 @@ const AUTO_RETRY_DELAY_MS = 10 * 60 * 1000; // 失败后自动重试间隔
 
 let index = store.loadIndex(DATA_DIR);
 let posts = store.loadPosts(DATA_DIR);
-let settings = store.loadSettings(DATA_DIR);
 const auth = new Auth(DATA_DIR);
 let scanning = false;
 const fetchQueue = new Set();
@@ -502,34 +499,6 @@ async function handleApi(req, res, pathname, query) {
   if (pathname === '/api/refresh') {
     setImmediate(scanAndSave);
     return sendJson(res, 202, { scanning: true });
-  }
-  if (pathname === '/api/settings') {
-    if (req.method === 'GET') {
-      return sendJson(res, 200, { downloadDir: settings.downloadDir || '' });
-    }
-    if (req.method === 'PUT') {
-      const body = await readBody(req);
-      const downloadDir = String(body.downloadDir || '').trim();
-      if (!downloadDir) {
-        return sendJson(res, 400, { error: '下载文件夹路径不能为空' });
-      }
-      if (!path.isAbsolute(downloadDir)) {
-        return sendJson(res, 400, { error: '下载文件夹路径必须是绝对路径' });
-      }
-      // downloadDir 为宿主机实际路径（部署机视角）；下载功能使用时需经挂载映射到容器内路径
-      settings = { ...settings, downloadDir };
-      store.saveSettings(DATA_DIR, settings);
-      let containerPath = '';
-      let warning = '';
-      if (HOST_MEDIA_ROOT && downloadDir.startsWith(HOST_MEDIA_ROOT)) {
-        // 媒体根已可写挂载进容器：宿主机路径前缀替换为容器内媒体根，保存后即可用
-        containerPath = path.join(ROOT, downloadDir.slice(HOST_MEDIA_ROOT.length));
-      } else if (HOST_MEDIA_ROOT) {
-        warning = `该路径不在媒体根目录（${HOST_MEDIA_ROOT}）内，未挂载进容器，需手动在 compose 中添加挂载`;
-      }
-      return sendJson(res, 200, { ok: true, downloadDir, containerPath, warning });
-    }
-    return sendJson(res, 405, { error: '方法不支持' });
   }
   if (pathname === '/api/texts') {
     const status = query.get('status');

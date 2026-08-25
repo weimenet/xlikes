@@ -29,7 +29,6 @@ Xlikes 直接扫描媒体根目录下的这些文件（只读文件名、不读�
 - **多源文案抓取**：fxtwitter → vxtwitter → oembed → Wayback 快照 → x.com embed → x.com 主站，6 级降级；失败自动重试（最多 3 轮），可手动重试 / 手动填写
 - **抓取管理台**：进度条 + 抓取中状态、按状态筛选（已抓取 / 待抓取 / 失败 / 原帖不存在）、手动添加链接
 - **增量扫描**：对比整个目录树（新增 / 删除 / 变更用户），新内容自动入索引并触发文案抓取；控制台提供手动扫描按钮
-- **下载路径设置**：控制台可配置媒体下载输出目录（宿主机实际绝对路径），为媒体下载功能预留
 
 ## 技术栈
 
@@ -93,7 +92,6 @@ node scripts/add-user.js <用户名> <密码>
 ```
 
 环境变量：`XLIKES_MEDIA_ROOT`（媒体根目录，建议必填；缺省为 `./media`）、
-`XLIKES_HOST_MEDIA_ROOT`（宿主机媒体根实际路径，用于把设置中的宿主机下载路径映射为容器内路径）、
 `XLIKES_MEDIA_LIMIT`（媒体扫描上限，0 = 全部）、`DATA_DIR`、`HTTPS_PORT` / `HTTP_PORT`、
 `CERT_DIR`、`RESCAN_MS`（增量扫描间隔）、`FETCH_INTERVAL_MS`（文案抓取限速）。
 
@@ -110,11 +108,8 @@ docker exec xlikes node scripts/add-user.js <用户名> <密码>
 
 部署前编辑 `docker-compose.yml`：
 - `XLIKES_MEDIA_ROOT`：容器内媒体根目录（建议与下方挂载一致）；
-- `XLIKES_HOST_MEDIA_ROOT`：宿主机媒体根的实际路径（部署机视角）；
-- `volumes`：媒体目录**可写**挂载到容器内 `XLIKES_MEDIA_ROOT`（供下载功能输出）；数据目录建议放在媒体根目录的
+- `volumes`：媒体目录只读挂载到容器内 `XLIKES_MEDIA_ROOT`；数据目录建议放在媒体根目录的
   `.data` 子目录（容器崩溃/重建不影响配置与缓存）；证书目录改为实际路径。
-
-控制台“设置”中的下载文件夹路径填宿主机实际路径；只要位于媒体根目录内，保存后会自动映射为容器内路径并立即生效。
 
 容器 `restart: unless-stopped`，开机自启。
 
