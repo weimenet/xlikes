@@ -744,19 +744,24 @@ function renderAccount(container) {
   state.mode = 'account';
   container.appendChild(el('div', 'page-title', '账户管理'));
   const card = el('div', 'post-card');
-  const userRow = el('div', 'stats-line');
-  const uname = el('span', 's-value', '…');
-  userRow.append(el('span', 's-label', '当前用户名'), uname);
-  card.appendChild(userRow);
+  const userBlock = el('div', 'account-user');
+  userBlock.appendChild(el('div', 's-label', '当前用户名'));
+  const uname = el('div', 'account-username', '…');
+  userBlock.appendChild(uname);
+  card.appendChild(userBlock);
   const section = el('div', 'account-section-title', '修改密码');
   card.appendChild(section);
+  const form = el('div', 'account-form');
   const oldP = el('input');
+  oldP.className = 'text-input';
   oldP.type = 'password';
   oldP.placeholder = '当前密码';
   const newP = el('input');
+  newP.className = 'text-input';
   newP.type = 'password';
-  newP.placeholder = '新密码（至少 8 位）';
+  newP.placeholder = '新密码(至少8位)';
   const confirmP = el('input');
+  confirmP.className = 'text-input';
   confirmP.type = 'password';
   confirmP.placeholder = '确认新密码';
   const msg = el('div', 'msg', '');
@@ -776,16 +781,14 @@ function renderAccount(container) {
       msg.textContent = d.error || '修改失败';
     }
   };
-  card.append(oldP, newP, confirmP, btn, msg);
-  oldP.style.marginBottom = '10px';
-  newP.style.marginBottom = '10px';
-  confirmP.style.marginBottom = '14px';
+  form.append(oldP, newP, confirmP, btn, msg);
+  card.appendChild(form);
   const logoutBtn = el('button', 'btn logout-btn', '退出登录');
   logoutBtn.onclick = async () => {
     await fetch('/api/logout', { method: 'POST' });
     location.href = '/login.html';
   };
-  card.append(oldP, newP, confirmP, btn, msg, logoutBtn);
+  card.appendChild(logoutBtn);
   container.appendChild(card);
   (async () => {
     try {
@@ -800,6 +803,7 @@ async function renderScan(container) {
   container.appendChild(el('div', 'page-title', '扫描'));
   const card = el('div', 'post-card');
   const btn = el('button', 'btn primary', '立即扫描');
+  btn.style.marginTop = '12px';
   function setRows(d) {
     card.innerHTML = '';
     const items = [
@@ -831,7 +835,7 @@ async function renderScan(container) {
     try { await fetch('/api/refresh'); } catch {}
     poll();
   };
-  container.append(btn, card);
+  container.append(card, btn);
   poll();
 }
 

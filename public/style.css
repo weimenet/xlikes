@@ -61,6 +61,19 @@ img, video { display: block; }
 .console-nav:hover { background: rgba(29, 155, 240, 0.1); color: var(--text); }
 .console-nav.active { background: rgba(29, 155, 240, 0.15); color: var(--accent); font-weight: 600; }
 .console-content { flex: 1; min-width: 0; }
+.text-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+}
+.text-input:focus { outline: none; border-color: var(--accent); }
+.account-user { padding: 4px 0 8px; }
+.account-username { font-size: 26px; font-weight: 700; margin-top: 4px; }
+.account-form .text-input { margin-bottom: 10px; }
 .stats-line {
   display: flex;
   justify-content: space-between;
