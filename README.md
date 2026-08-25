@@ -1,102 +1,118 @@
-# Xlikes 瀑布流浏览服务
+# Xlikes
 
-浏览 媒体下载目录的媒体：首页瀑布流（按时间轴倒序、缩略图分屏加载）、用户主页、
-仿 X 的帖子详情页（缩略图点击看原图、文案与原文链接）、文案抓取管理页。
-零 npm 依赖，只用 Node.js 内置模块，路由器上免编译免下载；缩略图依赖系统 `ffmpeg`。
+> 自托管的 X（Twitter）媒体库浏览器 —— 从 媒体下载目录扫描图片与视频，
+> 提供 Pinterest 风格拼图瀑布流、ID 索引、仿 X 帖子详情与多源文案抓取。
+> 登录保护 + HTTPS，部署在局域网内使用，零 npm 依赖。
 
-## 文件结构
+## 简介
+
+媒体文件按 `用户 ID / 发布日期` 的目录结构保存，
+文件名中编码了帖子 ID 与媒体 ID。Xlikes 直接扫描这些文件（只读文件名、不读内容），
+解析出帖子元数据并构建索引，无需额外数据库。
+
+浏览器端提供三层浏览体验：**全部贴文**（按时间排序的拼图瀑布流，同一帖子的多张媒体合并为一张卡片）、
+**ID 索引**（按首字母 / 数字 / 特殊符号分组，右侧面包屑快速跳转）、**帖子页**（缩略图点击看原图，
+自动抓取帖子文案并溯源到 x.com 原帖）。
+
+服务端内置 HTTPS（自签证书）、基于 Cookie 的登录会话（新登录自动踢掉旧设备）、
+全目录增量扫描、ffmpeg 缩略图缓存，以及 6 级数据源的文案抓取（含被删帖的 Wayback 历史快照）。
+整个服务只用 Node.js 内置模块实现，任何能跑 Node 18+ 的设备都能运行。
+
+## 功能特性
+
+- **登录保护**：无注册入口，用户由管理员手动添加；密码 scrypt 加盐哈希；单设备会话（新登录使旧会话失效）；记录每次登录的 IP / 设备 / 结果
+- **HTTPS**：自签证书，局域网加密访问；HTTP 端口自动 302 跳转到 HTTPS
+- **拼图瀑布流**：同一帖子的媒体自动合并（单图 / 上下 2 宫格 / 上 2 下 1 / 2×2 宫格，超过 4 张显示 `+N`），底部渐变悬浮层显示发帖 ID 与两行文案摘录
+- **筛选排序**：按日期新→旧 / 旧→新、时间段筛选；搜索支持模糊匹配用户 ID 与文案内容；筛选与排序在搜索结果中同样可用
+- **ID 索引**：A-Z / 0-9 / 特殊符号分组（字母不区分大小写），按字母或贴文数排序，右侧竖排面包屑平滑跳转
+- **帖子详情**：缩略图点击看原图（图片灯箱 / 视频原地播放），仿 X 布局，含原文链接
+- **多源文案抓取**：fxtwitter → vxtwitter → oembed → Wayback 快照 → x.com embed → x.com 主站，6 级降级；失败自动重试（最多 3 轮），可手动重试 / 手动填写
+- **抓取管理台**：进度条 + 抓取中状态、按状态筛选（已抓取 / 待抓取 / 失败 / 原帖不存在）、手动添加链接
+- **增量扫描**：对比整个目录树（新增 / 删除 / 变更用户），新内容自动入索引并触发文案抓取；控制台提供手动扫描按钮
+
+## 技术栈
+
+| 层 | 选型 |
+|---|---|
+| 后端 | Node.js 内置模块（http / https / crypto / fs），零 npm 依赖 |
+| 前端 | 原生 HTML / CSS / JS SPA（hash 路由，无框架、无构建步骤） |
+| 存储 | JSON 文件（索引、文案缓存、用户库、登录日志），原子写入 |
+| 缩略图 | ffmpeg（图片缩放 / 视频抽帧），缓存到 `data/thumbs/` |
+| 部署 | Docker（node:22-alpine + ffmpeg），OpenWrt procd 脚本备选 |
+
+## 架构
 
 ```
-<media-root>/            # 媒体根目录（XLIKES_MEDIA_ROOT）
-└── <user-id>/                    # 用户 ID
-    └── 2026-04-03/               # 帖子发布日期
-        └── <user-id>_20260403__<tweet-id>_1_<media-id>.mp4
+浏览器 ──HTTPS 5287──→ server.js（Node 内置 https）
+                          │ 认证中间件：HttpOnly Cookie 会话
+                          ├─ /api/feed|search|users|post 帖子与索引 API
+                          ├─ /api/texts* 文案抓取队列与状态
+                          ├─ /api/login|logout|me|login-log 认证
+                          ├─ /thumb  ffmpeg 缩略图（缓存）
+                          └─ /media  原图/原视频（HTTP Range）
+媒体根目录 <media-root> ──→ lib/scanner 全目录增量扫描
+lib/fetcher ──→ fxtwitter/vxtwitter/oembed/wayback/x embed/x 主站
 ```
 
-文件名 = `<用户ID>_<YYYYMMDD>__<帖子ID>_<媒体编号>_<媒体ID>.<ext>`
-原帖链接 = `https://x.com/<用户ID>/status/<帖子ID>`
+## 目录结构
 
-## 本地运行
+```
+xlikes/
+├── server.js              # 服务入口（HTTPS + HTTP 跳转）
+├── lib/
+│   ├── auth.js            # 用户、scrypt 哈希、单设备会话、登录日志
+│   ├── scanner.js         # 全目录增量扫描
+│   ├── parser.js          # 文件名正则解析（snowflake 解码时间）
+│   ├── store.js           # JSON 存储（原子写入）
+│   ├── fetcher.js         # 6 级文案抓取源
+│   └── thumbs.js          # ffmpeg 缩略图
+├── public/                # SPA（瀑布流 / ID 索引 / 帖子页 / 管理台 / 登录页）
+├── scripts/
+│   ├── add-user.js        # 唯一建号入口（含改密）
+│   ├── gen-cert.sh        # 生成 HTTPS 自签证书
+│   └── parse_xlikes.py   # 独立文件名解析工具
+├── init.d/xlikes          # OpenWrt procd 自启脚本（无 Docker 备选）
+├── Dockerfile / docker-compose.yml
+└── data/                  # 运行数据（索引、缓存、用户库；不提交）
+```
+
+## 快速开始（本地）
 
 ```bash
-node server.js                       # 默认媒体根 <media-root>，端口 3000
-node server.js --rescan              # 强制重建索引后启动
-XLIKES_MEDIA_LIMIT=200 node server.js     # 只索引前 200 条（调试用）
+# 1. 生成 HTTPS 证书
+sh scripts/gen-cert.sh
+
+# 2. 启动（默认媒体根 <media-root>，HTTPS 3000 / HTTP 跳转 3080）
+node server.js
+
+# 3. 添加用户
+node scripts/add-user.js <用户名> <密码>
+
+# 4. 打开 https://localhost:3000 登录
 ```
 
-打开 http://localhost:3000 。
+环境变量：`XLIKES_MEDIA_ROOT`（媒体根目录）、`DATA_DIR`、`HTTPS_PORT` / `HTTP_PORT`、
+`CERT_DIR`、`RESCAN_MS`（增量扫描间隔）、`FETCH_INTERVAL_MS`（文案抓取限速）。
 
-## 环境变量
-
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `XLIKES_MEDIA_ROOT` | `<media-root>` | 媒体根目录 |
-| `PORT` | `3000` | 服务端口 |
-| `DATA_DIR` | `./data` | 索引与文案缓存目录 |
-| `XLIKES_MEDIA_LIMIT` | `0`（全部） | 最多索引多少条媒体 |
-| `RESCAN_MS` | `600000` | 增量扫描间隔（毫秒） |
-| `FETCH_INTERVAL_MS` | `5000` | 文案抓取限速（毫秒/条） |
-
-## API
-
-- `GET /api/feed?offset=&limit=` 瀑布流媒体（按帖子时间倒序）
-- `GET /api/users?offset=&limit=` 用户列表（按媒体数排序）
-- `GET /api/user/:id?offset=&limit=` 指定用户的媒体
-- `GET /api/post/:tweetId` 帖子详情（媒体 + 文案 + 原文链接）
-- `GET /api/text/:tweetId` 文案状态（前端轮询用）
-- `GET /api/texts?status=&offset=&limit=` 文案抓取列表 + 统计
-- `POST /api/texts/retry` 手动重试单条 `{tweetId}`
-- `POST /api/texts/retry-all` 按状态批量重试 `{status}`
-- `POST /api/texts/add` 手动添加链接 `{url: "https://x.com/user/status/123"}`
-- `GET /thumb/<相对路径>` 媒体缩略图（图片缩放 / 视频抽帧，缓存到 `data/thumbs/`）
-- `GET /media/<相对路径>` 媒体文件（支持 HTTP Range，视频可拖动）
-- `GET /api/refresh` 后台重建索引
-- `GET /api/health` 健康检查
-
-## 文案抓取
-
-后台静默抓取全部帖子文案：优先走 `publish.twitter.com/oembed`（免登录、稳定），
-失败后回退抓取 `x.com/<user>/status/<id>` 页面中 `class="r-bcqeeo"` 的 div。
-结果缓存在 `DATA_DIR/xlikes-posts.json`，状态标记：
-
-- `ok` 已抓取（含来源 oembed / x）
-- `pending` 待抓取
-- `failed` 抓取失败（可手动重试）
-- `not_found` 原帖不存在（404，不自动重试）
-
-打开帖子页会自动按需抓取；管理页 `#/texts` 可查看统计、按状态筛选、单条重试、
-批量重试失败项、粘贴 x.com 链接手动添加抓取。
-
-## 缩略图
-
-瀑布流与帖子页默认加载 `/thumb/` 缩略图（图片缩放、视频抽帧，宽 480px），
-点击帖子内媒体才加载原图/原视频。缩略图由 ffmpeg 生成并缓存到
-`DATA_DIR/thumbs/`；若 ffmpeg 不可用，自动回退到原图（视频显示首帧占位）。
-
-## 部署到目标机（<host-ip>:5287）
-
-先在目标机上把 媒体共享挂载到 `<media-root>`（SMB/NFS 均可），再选一种方式：
-
-### 方式一：Docker（推荐，需目标机支持 Docker）
+## Docker 部署（ <host-ip>:5287）
 
 ```bash
-scp -r xlikes root@<host-ip>:<deploy-dir>
+scp -r xlikes root@<host-ip>:/root/
 ssh root@<host-ip>
-cd <deploy-dir> && docker compose up -d --build
+cd <deploy-dir> && docker-compose up -d --build
+docker exec xlikes node scripts/add-user.js <用户名> <密码>
 ```
 
-compose 已配置 `restart: unless-stopped`，开机自启、映射 5287 端口。
-若目标机无法在线构建镜像，可在本机 `docker build` 后
-`docker save | ssh root@<host-ip> docker load` 导入。
+端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS。
+挂载：媒体目录 `<media-root>:/data/xlikes:ro`、数据 `<deploy-dir>/data`、证书 `<deploy-dir>/certs`。
+容器 `restart: unless-stopped`，开机自启。
 
-### 方式二：无 Docker（OpenWrt / iStoreOS）
+## 数据与备份
 
-```bash
-ssh root@<host-ip>
-opkg install node ffmpeg
-cp <deploy-dir>/init.d/xlikes /etc/init.d/xlikes
-chmod +x /etc/init.d/xlikes
-/etc/init.d/xlikes enable && /etc/init.d/xlikes start
-```
+`data/` 目录包含全部可备份数据：媒体索引、文案缓存、用户库、登录日志、缩略图缓存。
+整体复制即可备份；恢复后重启容器自动加载。
 
-最后在目标机防火墙放行 5287 端口（或做端口转发）。
+## 免责声明
+
+本项目仅用于浏览个人已下载的媒体归档，请遵守所在地法律法规与 X 平台服务条款；
+文案抓取仅用于本地展示，请勿滥用或对外公开。
