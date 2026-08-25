@@ -118,21 +118,73 @@ node scripts/add-user.js <用户名> <密码>
 
 ## Docker 部署
 
+容器内的**代码**在构建镜像时通过 `Dockerfile` 的 `COPY` 写入镜像（`server.js`、`lib/`、`public/`、`scripts/`）；
+**配置与数据**通过卷挂载进容器（媒体、数据、证书目录），不随镜像重建丢失。
+
+### 1. 生成 HTTPS 证书（宿主机）
+
 ```bash
+sh scripts/gen-cert.sh
+# 局域网 IP 部署时指定 IP：XLIKES_CERT_CN=<局域网IP> sh scripts/gen-cert.sh
+```
+
+证书生成在 `certs/`（cert.pem / key.pem），部署时挂载进容器。
+
+### 2. 编辑 docker-compose.yml
+
+按实际环境修改环境变量与三个挂载路径：
+
+```yaml
+services:
+  xlikes:
+    build: .                       # 从当前目录构建镜像（代码写入容器）
+    ports:
+      - "5287:3000"                # HTTPS 主入口
+      - "5280:3080"                # HTTP 跳转 HTTPS
+    environment:
+      XLIKES_MEDIA_ROOT: /data/xlikes      # 容器内媒体根目录
+      DATA_DIR: /data/store                # 容器内数据目录
+      CERT_DIR: /app/certs                 # 容器内证书目录
+    volumes:
+      - /path/to/media:/data/xlikes:ro     # 媒体根目录（宿主机实际路径，只读）
+      - /path/to/media/.data:/data/store   # 配置/缓存（建议放媒体根下 .data，可写）
+      - /path/to/certs:/app/certs:ro       # HTTPS 证书（宿主机实际路径，只读）
+```
+
+### 3. 传输代码并启动
+
+```bash
+# 从本机把项目目录传到目标机
 scp -r xlikes root@<主机IP>:<部署目录>/
+
+# 登录目标机，构建镜像并启动容器
 ssh root@<主机IP>
-cd <部署目录>/xlikes && docker-compose up -d --build
+cd <部署目录>/xlikes
+docker-compose up -d --build
+
+# 首次部署：添加登录用户
 docker exec xlikes node scripts/add-user.js <用户名> <密码>
 ```
 
-端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS。
+端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS；容器 `restart: unless-stopped`，开机自启。
 
-部署前编辑 `docker-compose.yml`：
-- `XLIKES_MEDIA_ROOT`：容器内媒体根目录（建议与下方挂载一致）；
-- `volumes`：媒体目录只读挂载到容器内 `XLIKES_MEDIA_ROOT`；数据目录建议放在媒体根目录的
-  `.data` 子目录（容器崩溃/重建不影响配置与缓存）；证书目录改为实际路径。
+### 4. 验证
 
-容器 `restart: unless-stopped`，开机自启。
+```bash
+docker ps                          # 容器状态 Up
+docker logs xlikes                 # 启动日志：媒体根目录 / 数据目录 / 待抓取文案数
+curl -k https://127.0.0.1:5287     # 返回登录页
+```
+
+### 更新代码
+
+重新传输代码后重建（`docker-compose.yml`、`data/`、`certs/` 不要覆盖，保持实际配置）：
+
+```bash
+cd xlikes && tar czf - --exclude=.git --exclude=data --exclude=certs --exclude=docker-compose.yml . \
+  | ssh root@<主机IP> 'tar xzf - -C <部署目录>/xlikes'
+ssh root@<主机IP> 'cd <部署目录>/xlikes && docker-compose up -d --build'
+```
 
 ## 数据与备份
 
