@@ -1,6 +1,6 @@
 # Xlikes
 
-> 自托管的 X（Twitter）媒体库浏览器 —— 从 xlikes 媒体根目录扫描图片与视频，
+> 自托管的 X（Twitter）媒体库浏览器 —— 从 Xlikes 媒体根目录扫描图片与视频，
 > 提供 Pinterest 风格拼图瀑布流、ID 索引、仿 X 帖子详情与多源文案抓取。
 > 登录保护 + HTTPS，部署在局域网内使用，零 npm 依赖。
 
