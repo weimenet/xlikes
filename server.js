@@ -514,6 +514,7 @@ async function handleApi(req, res, pathname, query) {
       if (!path.isAbsolute(downloadDir)) {
         return sendJson(res, 400, { error: '下载文件夹路径必须是绝对路径' });
       }
+      // downloadDir 为宿主机实际路径（部署机视角）；下载功能使用时需经挂载映射到容器内路径
       settings = { ...settings, downloadDir };
       store.saveSettings(DATA_DIR, settings);
       return sendJson(res, 200, { ok: true, downloadDir });

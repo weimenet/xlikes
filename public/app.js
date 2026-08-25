@@ -823,8 +823,8 @@ function renderSettings() {
   page.appendChild(el('div', 'page-title', '设置'));
   const card = el('div', 'post-card');
   const dirInput = el('input');
-  dirInput.placeholder = '下载文件夹路径，如 /data/downloads';
-  const hint = el('div', 'msg', '媒体下载功能的输出目录（绝对路径），需与部署时的目录挂载对应。');
+  dirInput.placeholder = '宿主机实际路径，如 /path/to/downloads';
+  const hint = el('div', 'msg', '媒体下载功能的输出目录（部署机上的实际绝对路径，不是容器内路径）；使用时需将该路径以可写方式挂载进容器。');
   const msg = el('div', 'msg', '');
   const btn = el('button', 'btn primary', '保存');
   btn.onclick = async () => {
