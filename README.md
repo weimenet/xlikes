@@ -32,23 +32,31 @@ Xlikes 直接扫描媒体根目录下的这些文件（只读文件名、不读�
 **ID 索引**（按首字母 / 数字 / 特殊符号分组，右侧面包屑快速跳转）、**帖子页**（缩略图点击看原图，
 自动抓取帖子文案并溯源到 x.com 原帖）。
 
-服务端内置 HTTPS（自签证书）、基于 Cookie 的登录会话（新登录自动踢掉旧设备）、
+服务端内置 HTTPS（自签证书）、基于 Cookie 的登录会话（多设备并存，可在设置里踢下线）、
 全目录增量扫描、ffmpeg 缩略图缓存，以及 6 级数据源的文案抓取（含被删帖的 Wayback 历史快照）。
 管理功能集中在**控制台**页面（左侧栏：扫描 / 文案 / 日志 / 账户管理）。
 整个服务只用 Node.js 内置模块实现，任何能跑 Node 18+ 的设备都能运行。
 
 ## 功能特性
 
-- **登录保护**：无注册入口，用户由管理员手动添加；密码 scrypt 加盐哈希；单设备会话（新登录使旧会话失效）；记录每次登录的 IP / 设备 / 结果
+- **登录保护**：无注册入口；密码 scrypt 加盐哈希；多设备会话并存，可在设置里查看已登录设备并踢下线；记录每次登录的 IP / 设备 / 结果
 - **HTTPS**：自签证书，局域网加密访问；HTTP 端口自动 302 跳转到 HTTPS
-- **拼图瀑布流**：同一帖子的媒体自动合并（单图 / 上下 2 宫格 / 上 2 下 1 / 2×2 宫格，超过 4 张显示 `+N`），底部渐变悬浮层显示发帖 ID 与两行文案摘录
-- **筛选排序**：按日期新→旧 / 旧→新、时间段筛选；搜索支持模糊匹配用户 ID 与文案内容；筛选与排序在搜索结果中同样可用
+- **拼图瀑布流**：同一帖子的媒体自动合并（单图 / 上下 2 宫格 / 上 2 下 1 / 2×2 宫格，超过 4 张显示 `+N`）；单图按原始比例自适应高度，多图走统一档位；卡片底部渐变层显示用户 ID、时间与两行文案
+- **筛选排序**：按发布时间新→旧 / 旧→新、添加时间新→旧 / 旧→新、时间段筛选；搜索支持模糊匹配用户 ID 与文案内容；筛选与排序在搜索结果中同样可用
+- **缩略图加速**：320px WebP + 内容版本号长缓存（缩略图变了自动刷新，没变一直命中缓存）；视频优先抓封面，抓不到再抽帧
+- **NSFW 模式**：顶部滑动开关（默认开启，手动改过则记住），一键模糊全部媒体；视频在开启时提示「NSFW 模式无法播放」且点击无效；头像不参与模糊
+- **防盗链**：媒体 / 缩略图 / 头像校验 Referer 与 Origin，外站引用返回 403；无 Referer 的「另存为」正常放行
+- **内置抓取**：顶部下载栏粘贴链接即可抓取（支持多条，按 `http` 自动切分，兼容新版分享链接格式），容器内调用 gallery-dl 按命名规则落盘并定向入库，**同时把帖子文案与作者信息写入文案缓存**（媒体目录里不留额外文件）；队列弹窗显示进行中 / 排队中 / 失败 / 已完成，失败可重试，任务落盘保留 7 天
+- **重复抓取识别**：提交链接时若该帖已在库中，会标记为「已存在」并跳过下载，任务行可直接跳转站内记录；确实需要重抓时可选择「仍然抓取」
+- **抓取维护**：控制台可检查 gallery-dl 是否有新版本，一键在容器内更新（升级后自动自检，未通过会自动回滚）；批量补抓带限速、随机间隔与连续无收获自动停止
+- **响应式**：手机 / 平板 / 桌面与不同 DPI 自适应，窄屏时顶部栏、下载栏、队列弹窗自动折行或限高滚动
 - **ID 索引**：A-Z / 0-9 / 特殊符号分组（字母不区分大小写），按字母或贴文数排序，右侧竖排面包屑平滑跳转
-- **帖子详情**：缩略图点击看原图（图片灯箱 / 视频原地播放），仿 X 布局，含原文链接
-- **多源文案抓取**：fxtwitter → vxtwitter → oembed → Wayback 快照 → x.com embed → x.com 主站，6 级降级；失败自动重试（最多 3 轮），可手动重试 / 手动填写
-- **控制台**：页面化管理，左侧栏菜单（扫描 / 文案 / 日志 / 账户管理）
+- **帖子详情**：缩略图点击看原图（图片灯箱 / 视频原地播放），仿 X 布局；头部提供「查看原文」，正文里指向站内已有账号的 @ID 可点击跳转
+- **媒体交互**：大图模式与视频播放中长按（桌面为右键）弹出统一菜单，可保存到设备、复制图片 / 复制当前帧、画中画；返回手势或返回键优先退出大图、停止播放，而不是离开页面
+- **多源文案抓取**：内置抓取带回来的文案优先，扫描到的新帖与抓取遗漏的走多级降级源；失败自动重试（最多 3 轮），可手动重试 / 手动填写
+- **控制台**：页面化管理，左侧栏菜单（扫描 / 抓取 / 日志 / 账户管理 / 登录设备）
 - **扫描页**：显示用户 ID 数量、媒体数量、上次扫描时间与扫描类型（自动 / 手动），支持一键手动扫描
-- **文案抓取管理**：进度条 + 抓取中状态、按状态筛选（已抓取 / 待抓取 / 失败 / 原帖不存在）、手动添加链接
+- **抓取管理**：进度条与抓取中状态、按状态筛选（已抓取 / 待抓取 / 失败 / 原帖不存在）、单条重试 / 手填文案；支持 gallery-dl 批量补抓（`刷新` 补抓未标记、`重试全部失败` 重抓失败项），带限速与自动止损
 - **账户管理**：当前用户名、修改密码、退出登录（合并原改密与退出入口）
 - **增量扫描**：对比整个目录树（新增 / 删除 / 变更用户），新内容自动入索引并触发文案抓取；扫描页显示最近一次扫描状态
 
@@ -70,11 +78,13 @@ Xlikes 直接扫描媒体根目录下的这些文件（只读文件名、不读�
                           ├─ /api/feed|search|users|post 帖子与索引 API
                           ├─ /api/texts* 文案抓取队列与状态
                           ├─ /api/stats|refresh 扫描统计与手动扫描
+                          ├─ /api/download*      粘贴链接抓取（gallery-dl）与队列状态
                           ├─ /api/login|logout|me|login-log 认证
                           ├─ /thumb  ffmpeg 缩略图（缓存）
                           └─ /media  原图/原视频（HTTP Range）
 媒体根目录（XLIKES_MEDIA_ROOT）──→ lib/scanner 全目录增量扫描
 lib/fetcher ──→ fxtwitter/vxtwitter/oembed/wayback/x embed/x 主站
+gallery-dl（容器内）──→ 按 gallery-dl.toml 落盘到媒体根目录 → 定向入库
 ```
 
 ## 目录结构
@@ -83,7 +93,7 @@ lib/fetcher ──→ fxtwitter/vxtwitter/oembed/wayback/x embed/x 主站
 xlikes/
 ├── server.js              # 服务入口（HTTPS + HTTP 跳转）
 ├── lib/
-│   ├── auth.js            # 用户、scrypt 哈希、单设备会话、登录日志
+│   ├── auth.js            # 用户、scrypt 哈希、多设备会话（可踢下线）、登录日志
 │   ├── scanner.js         # 全目录增量扫描
 │   ├── parser.js          # 文件名正则解析（snowflake 解码时间）
 │   ├── store.js           # JSON 存储（原子写入）
@@ -91,9 +101,13 @@ xlikes/
 │   └── thumbs.js          # ffmpeg 缩略图
 ├── public/                # SPA（瀑布流 / ID 索引 / 帖子页 / 控制台 / 登录页）
 ├── scripts/
-│   ├── add-user.js        # 唯一建号入口（含改密）
+│   ├── add-user.js        # 用户管理脚本（用法见文件内注释）
+│   ├── refetch-missing.js # 批量补抓文案（只取元数据，限速）
 │   ├── gen-cert.sh        # 生成 HTTPS 自签证书
+│   ├── fetch-thumbs.js    # 批量生成缩略图（可断点续跑）
+│   ├── fetch-user-meta.js # 按用户直接补头像 / 用户名
 │   └── parse_xlikes.py    # 独立文件名解析工具
+├── gallery-dl.toml        # gallery-dl 配置（cookies 路径、基目录、命名规则）
 ├── docs/                  # 设计/评估文档
 ├── init.d/xlikes          # OpenWrt procd 自启脚本（无 Docker 备选）
 ├── Dockerfile / docker-compose.yml
@@ -109,8 +123,7 @@ sh scripts/gen-cert.sh
 # 2. 启动（媒体根目录由 XLIKES_MEDIA_ROOT 指定，HTTPS 3000 / HTTP 跳转 3080）
 XLIKES_MEDIA_ROOT=/path/to/media node server.js
 
-# 3. 添加用户
-node scripts/add-user.js <用户名> <密码>
+# 3. 首次部署需要一个账号才能登录（脚本用法见 scripts/add-user.js 内的注释）
 
 # 4. 打开 https://localhost:3000 登录
 ```
@@ -215,8 +228,7 @@ ssh root@<主机IP>
 cd <部署目录>/xlikes
 docker-compose up -d --build        # 使用 compose v2 时改为：docker compose up -d --build
 
-# 首次部署：添加登录用户
-docker exec xlikes node scripts/add-user.js <用户名> <密码>   # 密码非空即可，建议至少 8 位
+# 首次部署：需要一个登录账号才能进入（见容器内 scripts/add-user.js 的注释说明）
 ```
 
 端口：`5287` HTTPS 主入口，`5280` HTTP 自动跳转 HTTPS；容器 `restart: unless-stopped`，开机自启。
@@ -240,6 +252,38 @@ cd xlikes && tar czf - --exclude=.git --exclude=data --exclude=certs --exclude=d
   | ssh root@<主机IP> 'tar xzf - -C <部署目录>/xlikes'
 ssh root@<主机IP> 'cd <部署目录>/xlikes && docker-compose up -d --build'
 ```
+
+### 备选：无 docker-compose（仅 docker）
+
+部分精简系统（如只有 Docker 引擎、没装 compose 的 OpenWrt/iStoreOS）没有 `docker-compose`，可改用等价的
+`docker build` + `docker run` 重建。镜像名、端口、挂载、环境变量与上面的 compose 版完全一致：
+
+```bash
+cd <部署目录>/xlikes
+
+# 1. 构建镜像（tag 用 project_service 命名，与 compose 生成的一致）
+docker build -t xlikes-xlikes:latest .
+
+# 2. 停旧容器并删除（首次部署可跳过这两行）
+docker stop xlikes
+docker rm xlikes
+
+# 3. 启动新容器
+docker run -d --name xlikes --restart unless-stopped \
+  -p 5287:3000 -p 5280:3080 \
+  -e HTTPS_PORT=3000 -e HTTP_PORT=3080 -e CERT_DIR=/app/certs \
+  -e XLIKES_MEDIA_ROOT=/data/xlikes -e DATA_DIR=/data/store \
+  -v <证书目录>:/app/certs:ro \
+  -v <媒体根目录>:/data/xlikes:rw \
+  -v <媒体根目录>/.data:/data/store \
+  xlikes-xlikes:latest
+```
+
+媒体目录用 `:rw`：内置抓取要在容器里写文件（只读也能跑，但粘贴抓取会失败）。
+容器内 gallery-dl 固定读 `/data/store/cookies.txt`、写到 `/data/xlikes`，见 `gallery-dl.toml`。
+
+更新代码时：先按上面「更新代码」的 `tar` 命令把代码传到目标机（排除 data / certs / docker-compose.yml），
+再执行上面的三步即可，`data/` 与 `certs/` 仍走挂载卷，不会丢。
 
 ## 数据与备份
 

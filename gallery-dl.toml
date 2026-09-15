@@ -1,0 +1,63 @@
+# Xlikes 专用 gallery-dl 配置
+#
+# 这个文件只做三件事：带上登录态、把媒体落到媒体库、按 Xlikes 认识的规则命名。
+# Xlikes 靠「文件名 + 目录结构」把媒体识别入库，所以除非同步修改解析规则，
+# 不要改动 base-directory / filename / directory 这三项。
+#
+# 格式说明：gallery-dl 的 `-c` 只按 JSON 解析，带注释的配置必须用 TOML/YAML 专用参数：
+#   gallery-dl --config-toml /app/gallery-dl.toml <帖子链接>
+# 服务端和 scripts/refetch-missing.js 已经按这个参数调用。
+
+# ── 登录态 ────────────────────────────────────────────────────────────────
+# 路径是「容器内」路径；默认部署对应的宿主机文件是：
+#   /path/to/Xlikes/.data/cookies.txt
+# （挂载关系：宿主机的 <媒体库>/.data  →  容器 /data/store）
+#
+# 获取方式，二选一：
+#
+# 1）浏览器扩展导出（推荐）
+#    浏览器登录 x.com → 用「导出 cookies」类扩展（如 Get cookies.txt LOCALLY）
+#    导出 Netscape 格式 → 覆盖保存到上面那个宿主机路径，不需要重启服务。
+#
+# 2）手动写入（只要两个 cookie）
+#    浏览器登录 x.com → DevTools → Application/存储 → Cookies → https://x.com
+#    复制 auth_token 与 ct0 两个值，按下面的 Netscape 格式写成纯文本文件
+#    （<过期时间> 是 10 位 Unix 时间戳，填一个未来的时间即可，两行之间用制表符分隔）：
+#
+#      # Netscape HTTP Cookie File
+#      .x.com	TRUE	/	TRUE	9999999999	auth_token	<粘贴 auth_token 的值>
+#      .x.com	TRUE	/	TRUE	9999999999	ct0	<粘贴 ct0 的值>
+#
+# 登录态失效后抓取会失败、或拿不到高分辨率原图，重新导出覆盖即可。
+cookies = "/data/store/cookies.txt"
+
+# ── 媒体库位置 ────────────────────────────────────────────────────────────
+# 容器内媒体库根目录；Xlikes 的 XLIKES_MEDIA_ROOT 必须指向同一个目录。
+# 默认部署：宿主机 /path/to/Xlikes  →  容器 /data/xlikes
+base-directory = "/data/xlikes"
+
+# 保持 stdout 干净：批量补抓时要解析 gallery-dl 输出的 JSON，
+# 关掉多余输出避免干扰（出错信息仍会写到 stderr）。
+quiet = true
+
+# ── 入库规则（改动会直接影响能否入库）────────────────────────────────────
+# 目标文件名：<用户ID>_<发布日期YYYYMMDD>__<帖子ID>_<媒体序号>_<媒体ID>.<扩展名>
+# 例：<用户ID>_20260512__<帖子ID>_1_<媒体ID>.jpg
+#
+# 占位符含义：
+#   {author[name]}   账号 ID（不是昵称）
+#   {date:%Y%m%d}    帖子发布日期
+#   {tweet_id}       帖子 ID
+#   {num}            同一帖子内的媒体序号，从 1 开始
+#   {filename}       X 的媒体名（可能含下划线）
+#   {extension}      扩展名
+#
+# Xlikes 的文件名解析只认这个结构（媒体 ID 允许字母 / 数字 / 下划线 / 连字符），
+# 少一段、换顺序、改分隔符都会导致「下载成功但不在库里」。
+filename = "{author[name]}_{date:%Y%m%d}__{tweet_id}_{num}_{filename}.{extension}"
+
+# 目录结构：<用户ID>/<发布日期>
+# 完整路径示例（占位符形式）：
+#   /data/xlikes/<用户ID>/<YYYY-MM-DD>/<用户ID>_<YYYYMMDD>__<帖子ID>_<媒体序号>_<媒体ID>.jpg
+# 一级目录 = 用户、二级目录 = 日期，同样由 Xlikes 的扫描逻辑依赖。
+directory = ["{author[name]}", "{date:%Y-%m-%d}"]

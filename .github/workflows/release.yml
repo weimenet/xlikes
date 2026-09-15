@@ -47,19 +47,36 @@ jobs:
 
       - name: Build release notes
         run: |
-          BASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          VERSION=${GITHUB_REF_NAME#v}
           {
             echo "## Xlikes $GITHUB_REF_NAME"
             echo ""
             echo "自托管 X（Twitter）媒体库浏览器：瀑布流、ID 索引、帖子详情、多源文案抓取、登录保护 + HTTPS。"
             echo ""
-            if [ -n "$BASE_TAG" ] && [ "$BASE_TAG" != "$GITHUB_REF_NAME" ]; then
-              echo "### 自 $BASE_TAG 以来的变更"
+            # 优先取 CHANGELOG.md 里本版号的段落；取不到再回退到提交列表
+            if [ -f CHANGELOG.md ]; then
+              awk -v ver="$VERSION" '
+                $0 ~ "^## v?" ver "([^0-9.]|$)" { inside=1; next }
+                inside && /^## / { exit }
+                inside { print }
+              ' CHANGELOG.md > CHANGELOG_SECTION.md
             else
-              echo "### 首次发布"
+              : > CHANGELOG_SECTION.md
             fi
-            echo ""
-            git log --oneline --no-merges "${BASE_TAG}..HEAD" 2>/dev/null || git log --oneline --no-merges | head -50
+            if [ -s CHANGELOG_SECTION.md ]; then
+              cat CHANGELOG_SECTION.md
+            else
+              PREV_TAG=$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+              if [ -n "$PREV_TAG" ]; then
+                echo "### 自 $PREV_TAG 以来的变更"
+                echo ""
+                git log --oneline --no-merges "${PREV_TAG}..${GITHUB_REF_NAME}"
+              else
+                echo "### 首次发布"
+                echo ""
+                git log --oneline --no-merges | head -50
+              fi
+            fi
           } > NOTES.md
           cat NOTES.md
 

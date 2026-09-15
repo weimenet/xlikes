@@ -4,19 +4,40 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Xlikes</title>
-  <link rel="stylesheet" href="/style.css?v=5" />
+  <link rel="stylesheet" href="/style.css?v=40" />
 </head>
 <body>
   <header class="topbar">
     <a class="logo" href="#/">Xlikes</a>
     <nav>
+      <label class="nsfw-switch" title="NSFW 模式：模糊所有图片/视频，只显示文案">
+        <input type="checkbox" id="nsfwToggle" />
+        <span class="nsfw-slider"></span>
+        <span class="nsfw-label">NSFW</span>
+      </label>
       <a href="#/">全部贴文</a>
       <a href="#/users">ID索引</a>
       <a href="#/console">控制台</a>
     </nav>
   </header>
+  <div class="download-bar">
+    <input id="dl-url" type="text" placeholder="粘贴分享链接抓取(可一次粘贴多个，自动切分)" autocomplete="off" />
+    <button id="dl-btn" class="btn" type="button">抓取</button>
+    <button id="dl-queue-btn" class="btn" type="button">队列</button>
+    <span id="dl-msg" class="dl-msg"></span>
+  </div>
   <main id="main"></main>
   <div id="loading" class="loading hidden">加载中…</div>
-  <script src="/app.js?v=5"></script>
+  <div id="dl-modal" class="modal hidden">
+    <div class="modal-box">
+      <div class="modal-head">
+        <span>抓取队列</span>
+        <button id="dl-modal-close" class="modal-close" type="button" aria-label="关闭">×</button>
+      </div>
+      <div id="dl-list" class="dl-list"></div>
+      <div class="dl-foot">任务保留 7 天，过期自动移除</div>
+    </div>
+  </div>
+  <script src="/app.js?v=40"></script>
 </body>
 </html>

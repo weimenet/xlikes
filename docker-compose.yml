@@ -13,6 +13,6 @@ services:
       HTTP_PORT: "3080"
       CERT_DIR: /app/certs
     volumes:
-      - /path/to/media:/data/xlikes:ro         # 媒体根目录（改为实际路径，只读）
-      - /path/to/media/.data:/data/store       # 配置/缓存（建议放媒体根下 .data，容器崩溃不影响数据）
-      - /path/to/certs:/app/certs:ro           # HTTPS 自签名证书（改为实际路径）
+      - /path/to/Xlikes:/data/xlikes:ro         # 媒体根目录（改为实际路径）
+      - /path/to/Xlikes/.data:/data/store       # 配置/缓存（建议放媒体根下 .data，容器崩溃不影响数据）
+      - /path/to/xlikes/certs:/app/certs:ro     # HTTPS 自签名证书（改为实际路径）

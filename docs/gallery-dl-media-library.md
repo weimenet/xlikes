@@ -1,93 +1,57 @@
-# 使用 gallery-dl 构建符合 Xlikes 结构的媒体库
+# 用 gallery-dl 构建媒体库
 
-> 目标：用 [gallery-dl](https://codeberg.org/mikf/gallery-dl) 自动下载 X（Twitter）媒体，
-> 输出目录与文件名与 Xlikes 的解析规则完全一致，下载完成后 Xlikes 扫描即可展示。
+Xlikes 直接扫描媒体根目录的文件名，所以只要下载后的目录与文件名符合规则，就能被识别。
 
-## 为什么用 gallery-dl
-
-- 活跃维护的 Python CLI，支持 100+ 站点，官方提供 Docker 镜像；
-- 通过 `directory` / `filename` 模板可以精确生成 Xlikes 要求的目录与文件名；
-- 支持登录 cookies、限速、跳过已下载（archive），适合长期追更。
-
-## 1. 安装
-
-任选一种：
-
-```bash
-pip install gallery-dl          # Python
-brew install gallery-dl         # macOS
-docker pull ghcr.io/mikf/gallery-dl   # Docker
-```
-
-## 2. 准备 X 登录 cookies
-
-X 对未登录/自动化请求风控严格，建议使用小号并导出登录 cookies：
-
-1. 浏览器登录 X 后，用扩展（如 Chrome 的 *Get cookies.txt LOCALLY*）导出 Netscape 格式的
-   `cookies.txt`；
-2. 保存到安全位置，如 `~/.config/gallery-dl/cookies.txt`；
-3. cookies 会过期，定期重新导出。
-
-## 3. 配置文件（对齐 Xlikes 结构）
-
-配置文件默认位置 `~/.config/gallery-dl/config.json`：
-
-```json
-{
-  "extractor": {
-    "twitter": {
-      "cookies": "/path/to/cookies.txt",
-      "directory": ["{user[name]}", "{date:%Y-%m-%d}"],
-      "filename": "{user[name]}_{date:%Y%m%d}__{tweet_id}_{num}_{id}.{extension}",
-      "sleep-request": 5.0,
-      "archive": "/path/to/archive.sqlite"
-    }
-  }
-}
-```
-
-字段说明：
-
-| 模板字段 | 含义 |
-|---|---|
-| `{user[name]}` | 发帖用户 ID |
-| `{date:%Y-%m-%d}` / `{date:%Y%m%d}` | 发布日期（可格式化） |
-| `{tweet_id}` | 帖子 ID |
-| `{num}` | 帖内媒体序号 |
-| `{id}` | 媒体 ID |
-| `{extension}` | 扩展名 |
-
-输出结果与 Xlikes 媒体库结构一致：
+## 目录与命名规则
 
 ```
 <媒体根目录>/
 └── <用户ID>/
-    └── <YYYY-MM-DD>/
-        └── <用户ID>_<YYYYMMDD>__<帖子ID>_<媒体编号>_<媒体ID>.mp4
+    └── <发布日期 YYYY-MM-DD>/
+        └── <用户ID>_<发布日期 YYYYMMDD>__<帖子ID>_<媒体编号>_<媒体ID>.<扩展名>
 ```
 
-## 4. 下载使用
+媒体 ID 允许字母、数字、下划线与连字符；图片支持 jpg / jpeg / png，视频支持 mp4。
+
+## 服务内置的抓取（推荐）
+
+部署后不需要在命令行里手动跑 gallery-dl：
+
+1. 把 X 的分享链接粘到页面顶部下载栏（可多条，按 `http` 自动切分）
+2. 点「抓取」，容器内调用 gallery-dl 下载
+3. 下载完成后按上面的规则落盘，并定向扫描该用户目录入库
+
+队列按钮可以查看进行中 / 排队中 / 失败 / 已完成的任务，失败可重试；任务会落盘保存 7 天。
+
+## 抓取时顺带入库文案
+
+内置抓取在下载媒体的同时，会取出帖子正文与作者信息，按与多源文案抓取相同的数据结构
+写入文案缓存；媒体落盘目录与文件名规则完全不变，媒体目录里不会多出额外文件。
+已经存在、被跳过下载的帖子同样能拿到文案。
+
+新抓的帖子不需要再跑一次多源文案抓取；降级源只用于扫描到的新帖与抓取遗漏的补充。
+
+抓取用到登录态，cookie 文件固定放在数据目录（容器内 `/data/store/cookies.txt`），
+由 `gallery-dl.toml` 指定，不随镜像分发。
+
+### 登录态（cookies）怎么来
+
+- **位置**：容器内 `/data/store/cookies.txt`；默认部署对应的宿主机路径是 `<媒体库>/.data/cookies.txt`
+  （例如挂载为 `/path/to/Xlikes` 时就是 `/path/to/Xlikes/.data/cookies.txt`）；
+- **方式一（推荐）**：浏览器登录 x.com 后，用「导出 cookies」类扩展导出 Netscape 格式，直接覆盖保存到上面那个路径；
+- **方式二（手动写入）**：只写两行即可——从浏览器 DevTools → Application → Cookies → `https://x.com`
+  里复制 `auth_token` 与 `ct0` 的值，按 Netscape 格式写文件；具体格式示例写在 `gallery-dl.toml` 顶部的注释里；
+- 登录态失效后抓取会失败或拿不到高分辨率原图，重新导出覆盖即可（不用重启服务，下次抓取就会读到新文件）。
+
+## 手动跑 gallery-dl
 
 ```bash
-# 单个帖子
-gallery-dl "https://x.com/<用户ID>/status/<帖子ID>"
-
-# 整个账号的媒体
-gallery-dl "https://x.com/<用户ID>"
-
-# 批量（文件内每行一个链接）
-gallery-dl -i urls.txt
+# 容器内（配置文件已随镜像）
+docker exec xlikes gallery-dl --config-toml /app/gallery-dl.toml "<帖子链接>"
 ```
 
-## 5. 风控与限速建议
+## 常见坑
 
-- 使用小号 + cookies，避免主账号被封；
-- `sleep-request` 设置请求间隔（如上 5 秒）；
-- 大批量下载建议分段执行，遇到限流停一段时间再继续；
-- `archive` 记录已下载项，重复运行自动跳过。
-
-## 6. 验证
-
-- 用 `gallery-dl -K <链接>` 查看可用的元数据字段；
-- 下载完成后在 Xlikes「控制台 → 扫描」点「立即扫描」，或在全部贴文页直接查看新内容；
-- 也可用 `scripts/parse_xlikes.py --paths <文件路径>` 单独校验文件名是否符合解析规则。
+- 配置里必须显式指定 `base-directory`，否则文件会落到容器的工作目录，看起来「下载成功却不在媒体库」
+- 媒体目录要以 `:rw` 挂载，只读挂载下抓取会失败
+- 文件名里的媒体 ID 必须保留（X 的媒体名可能带下划线），解析器已放宽为字母 / 数字 / 下划线 / 连字符
