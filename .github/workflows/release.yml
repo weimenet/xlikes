@@ -51,7 +51,7 @@ jobs:
           {
             echo "## Xlikes $GITHUB_REF_NAME"
             echo ""
-            echo "自托管 X（Twitter）媒体库浏览器：瀑布流、ID 索引、帖子详情、多源文案抓取、登录保护 + HTTPS。"
+            echo "自托管 X（Twitter）媒体库浏览器：瀑布流、ID 索引、帖子详情、gallery-dl 文案抓取、登录保护 + HTTPS。"
             echo ""
             # 优先取 CHANGELOG.md 里本版号的段落；取不到再回退到提交列表
             if [ -f CHANGELOG.md ]; then

@@ -181,7 +181,7 @@ async function incrementalScan() {
 setInterval(async () => {
   const id = fetchQueue.values().next().value;
   if (!id) return;
-  if (metaJob.running) return; // gallery-dl 补抓进行中时先不让多源抓取并发请求（降低风控风险）
+  if (metaJob.running) return; // gallery-dl 补抓进行中时不让备用抓取并发请求（降低风控风险）
   fetchQueue.delete(id);
   const post = posts[id];
   if (!post || post.status === 'ok' || post.status === 'not_found') return;
