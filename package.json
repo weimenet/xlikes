@@ -2,6 +2,7 @@
   "name": "xlikes",
   "version": "1.1.0",
   "private": true,
+  "license": "GPL-2.0",
   "type": "commonjs",
   "description": "Xlikes 媒体瀑布流浏览服务（Node 内置模块，零依赖）",
   "scripts": {
