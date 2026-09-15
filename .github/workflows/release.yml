@@ -42,7 +42,7 @@ jobs:
           VERSION=${GITHUB_REF_NAME#v}
           tar czf xlikes-$VERSION.tar.gz \
             --exclude=.git --exclude=data --exclude=certs --exclude=docs \
-            server.js lib public scripts Dockerfile docker-compose.yml init.d README.md
+            server.js lib public scripts Dockerfile docker-compose.yml init.d README.md LICENSE
           ls -lh xlikes-$VERSION.tar.gz
 
       - name: Build release notes
